@@ -1,369 +1,450 @@
 /**
- * game.js — « Le Dossier Herbin »
- * =================================
- * State machine du jeu : accueil, 3 épreuves de 7 cartes chronométrées,
- * bilan final. Calcule le score selon le barème du document de scoring
- * validé et transmet le résultat à Bubble via ACCGP.sendScore.
+ * game.js : logique et rendu du jeu « Le Dossier Herbin ».
  *
- * Chaque écran reproduit à l'identique les écrans de la page Figma
- * « Mini Jeu 1_Développement_V2 » (textes, options, couleurs, mise en page).
+ * Chaque écran est dessiné sur une scène de 1638 × 1024 px, aux coordonnées
+ * exactes de la maquette Figma V2, puis mis à l'échelle pour tenir dans la
+ * fenêtre. Quand la scène deviendrait illisible (téléphone, tablette en
+ * portrait), la classe `is-flow` bascule sur la mise en page verticale.
+ *
+ * Le score part vers Bubble (ACCGP) une seule fois, au clic sur
+ * « Voir le classement », ou à la fermeture du jeu si le bilan est affiché.
  */
 'use strict';
 
 (function () {
-  var DATA = window.GAME_DATA;
-  var app = document.getElementById('app');
+  const DATA = window.GAME_DATA;
+  const RULES = DATA.scoring;
+  const { cardPoints, finalScore, tierFor, shuffle } = window.Scoring;
 
-  var state = {
-    epreuveIndex: 0,
-    cardIndex: 0,
+  const STAGE_W = DATA.meta.stage.width;
+  const STAGE_H = DATA.meta.stage.height;
+  const MAX_SCORE = DATA.meta.maxScore;
+  const TOTAL_CARDS = DATA.epreuves.reduce((n, ep) => n + ep.cards.length, 0);
+  // En dessous de cette échelle, le texte de 14 px de la maquette ferait moins de 7 px.
+  const FLOW_SCALE_THRESHOLD = 0.5;
+  const DRAG_THRESHOLD_PX = 6;
+
+  const root = document.documentElement;
+  const stage = document.getElementById('stage');
+
+  const state = {
+    screen: 'welcome',
+    epIndex: 0,
+    order: [],          // ordre aléatoire des cartes de l'épreuve en cours
+    cardPos: 0,
     score: 0,
-    streak: 0,
-    totalCorrect: 0,
-    cardStartTime: 0,
-    rafId: null,
+    correctCount: 0,
+    results: [],        // { epreuve, correct, points } pour chaque carte jouée
     answered: false,
+    cardStartedAt: 0,
+    timerFrame: 0,
+    advanceTimer: 0,
+    gameStartedAt: 0,
+    final: null,        // { score, tier } une fois le bilan atteint
+    scoreSent: false,
+    scale: 1,
   };
 
-  function render(html) {
-    app.innerHTML = html;
+  /* ---------- Utilitaires ---------- */
+
+  const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ESCAPES[c]);
+
+  const pointsLabel = (n) => `${n} point${n > 1 ? 's' : ''}`;
+  const timerLabel = (seconds) => `00 : ${String(seconds).padStart(2, '0')}`;
+  const currentEpreuve = () => DATA.epreuves[state.epIndex];
+  const currentCard = () => currentEpreuve().cards[state.order[state.cardPos]];
+
+  function line(item) {
+    if (item === '') return '<span class="line line--blank" aria-hidden="true">&nbsp;</span>';
+    if (typeof item === 'string') return `<span class="line">${esc(item)}</span>`;
+    if (item.title) return `<strong class="line line--title">${esc(item.title)}</strong>`;
+    return `<strong class="line">${esc(item.bold)}</strong>`;
   }
 
-  function currentEpreuve() {
-    return DATA.epreuves[state.epreuveIndex];
+  function textBlocks(blocks, width) {
+    return `<div class="consigne__text" style="--text-w:${width}px">${blocks
+      .map((block) => `<p class="consigne__block">${block.map(line).join('')}</p>`)
+      .join('')}</div>`;
   }
 
-  function currentCard() {
-    return currentEpreuve().cards[state.cardIndex];
+  const CORNERS_TOP = '<img src="img/corner-tl.svg" alt=""><img src="img/corner-tr.svg" alt="">';
+  // L'accueil utilise ses propres crochets du bas (pivotés), les autres écrans retournent ceux du haut.
+  const CORNERS_BOTTOM_WELCOME = '<span class="corner-rot corner-rot--left"><img src="img/corner-bl.svg" alt=""></span><span class="corner-rot corner-rot--right"><img src="img/corner-br.svg" alt=""></span>';
+
+  /** Panneau translucide encadré des 4 crochets rouges. */
+  function consigne(inner, modifier) {
+    const bottom = modifier === 'welcome' ? CORNERS_BOTTOM_WELCOME : CORNERS_TOP;
+    return `
+      <section class="consigne consigne--${modifier}">
+        <div class="corners" aria-hidden="true">${CORNERS_TOP}</div>
+        <div class="consigne__body"><div class="consigne__panel">${inner}</div></div>
+        <div class="corners corners--bottom${modifier === 'welcome' ? '' : ' corners--flipped'}" aria-hidden="true">${bottom}</div>
+      </section>`;
   }
 
-  function pointsLabel(n) {
-    return n <= 1 ? n + ' point' : n + ' points';
+  const background = (variant) => `<div class="bg bg--${variant}" aria-hidden="true"></div>`;
+
+  const chevron = '<img class="btn__chevron" src="img/chevron.svg" alt="" aria-hidden="true">';
+
+  function gameNav(ep) {
+    const cardNumber = Math.min(state.cardPos + 1, ep.cards.length);
+    return `
+      <header class="nav">
+        <p class="nav__side nav__step">${esc(ep.step)}</p>
+        <div class="nav__center">
+          <h1 class="nav__title">${esc(ep.title)}</h1>
+          <p class="nav__counter"><span class="nav__counter-label">Cartes :</span><span class="nav__counter-value">${cardNumber} / ${ep.cards.length}</span></p>
+        </div>
+        <p class="nav__side nav__score" data-ref="score">${pointsLabel(state.score)}</p>
+      </header>`;
   }
 
-  // ---------- Petits composants réutilisés sur plusieurs écrans ----------
-
-  function bracketCorners() {
-    return (
-      '<img class="corner corner--tl" src="images/corner-tl.svg" alt="" aria-hidden="true">' +
-      '<img class="corner corner--tr" src="images/corner-tr.svg" alt="" aria-hidden="true">' +
-      '<img class="corner corner--bl" src="images/corner-tl.svg" alt="" aria-hidden="true">' +
-      '<img class="corner corner--br" src="images/corner-tr.svg" alt="" aria-hidden="true">'
-    );
+  function endNav() {
+    return `
+      <header class="nav">
+        <div class="nav__logo"><img src="img/logo-adecco.webp" alt="Adecco"></div>
+        <div class="nav__center">
+          <h1 class="nav__title">${esc(DATA.end.title)}</h1>
+          <p class="nav__counter"><span class="nav__counter-label">${esc(DATA.end.progressLabel)}</span><span class="nav__counter-value">${esc(DATA.end.progressValue)}</span></p>
+        </div>
+        <div class="nav__logo nav__logo--ghost" aria-hidden="true"></div>
+      </header>`;
   }
 
-  function hudHtml(stepLabel, title, cardsLabel, options) {
-    options = options || {};
-    var left = options.logo
-      ? '<img class="hud__logo" src="images/adecco-logo.webp" alt="Adecco">'
-      : '<span class="hud__step">' + stepLabel + '</span>';
-    var right = options.logo
-      ? '<img class="hud__logo hud__logo--spacer" src="images/adecco-logo.webp" alt="" aria-hidden="true">'
-      : '<span class="hud__score" id="hud-score">' + pointsLabel(state.score) + '</span>';
-    return (
-      '<header class="hud">' +
-        left +
-        '<div class="hud__center">' +
-          '<h2 class="hud__title">' + title + '</h2>' +
-          (cardsLabel ? '<span class="hud__cards">' + cardsLabel + '</span>' : '') +
-        '</div>' +
-        right +
-      '</header>'
-    );
+  function pill(column) {
+    return `<span class="pill" aria-hidden="true"><span class="capsule capsule--${column.pill}" style="--tilt:${column.tilt}deg"><span class="capsule__body"></span><span class="capsule__shine"></span><span class="capsule__joint"></span></span></span>`;
   }
 
-  function epreuveCardsLabel(ep) {
-    return 'Cartes : ' + (state.cardIndex + 1) + ' / ' + ep.cards.length;
+  /* ---------- Scène et responsive ---------- */
+
+  function fitStage() {
+    const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+    state.scale = scale;
+    root.classList.toggle('is-flow', scale < FLOW_SCALE_THRESHOLD);
+    root.style.setProperty('--scale', String(scale));
   }
 
-  // Bandeau de rappel affiché en haut des écrans de carte : reprend
-  // l'enjeu + le texte condensé défini pour chaque épreuve.
-  function reminderBoxHtml(ep) {
-    var r = ep.reminder;
-    var inner = '<h3>' + r.enjeu + '</h3>' + r.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('');
-    return '<div class="bracket-panel reminder-box">' + bracketCorners() + inner + '</div>';
+  /** Échelle effective de la scène (1 en mise en page verticale, sans transformation). */
+  const effectiveScale = () => (root.classList.contains('is-flow') ? 1 : state.scale);
+
+  function setScreen(name, html) {
+    state.screen = name;
+    stage.className = `stage screen--${name}`;
+    stage.innerHTML = html;
+    window.scrollTo(0, 0);
   }
 
-  function capsuleHtml(col) {
-    var rotateClass = col.rotate === 'neg' ? ' capsule--rotate-neg' : col.rotate === 'pos' ? ' capsule--rotate-pos' : '';
-    return '<span class="capsule capsule--' + col.capsule + rotateClass + '" aria-hidden="true"></span>';
+  // Le focus ne suit l'écran que pour les joueurs au clavier : à la souris ou au doigt,
+  // un anneau de focus apparaîtrait sur un bouton absent de la maquette.
+  let keyboardUser = false;
+  window.addEventListener('keydown', () => { keyboardUser = true; }, true);
+  window.addEventListener('pointerdown', () => { keyboardUser = false; }, true);
+
+  function focus(selector) {
+    const el = stage.querySelector(selector);
+    if (el && keyboardUser) el.focus({ preventScroll: true });
   }
 
-  function mascotHtml(ep) {
-    return '<div class="mascot-pose mascot-pose--pose' + (state.epreuveIndex % 3) + '"></div>';
+  /* ---------- Écrans ---------- */
+
+  function renderWelcome() {
+    const w = DATA.welcome;
+    setScreen('welcome', `
+      ${background('home')}
+      ${consigne(`
+        <div class="avatar" aria-hidden="true"><img src="img/avatar-morpheus.webp" alt=""></div>
+        ${textBlocks(w.blocks, w.width)}
+        <button type="button" class="btn btn--cta" data-action="start">${esc(w.cta)}</button>`, 'welcome')}`);
+    focus('[data-action="start"]');
   }
 
-  // ---------- Écran d'accueil ----------
-
-  function showWelcome() {
-    var d = DATA.intro;
-    render(
-      '<section class="screen screen--narrative bg-light">' +
-        '<div class="bracket-panel panel panel--welcome">' +
-          bracketCorners() +
-          '<div class="avatar-circle"><img src="images/char-morpheus.webp" alt=""></div>' +
-          '<p class="eyebrow">' + d.eyebrow + '</p>' +
-          '<h1>' + d.title + '</h1>' +
-          d.paragraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-          d.closingParagraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-          '<button class="btn btn--primary" id="btn-start">' + d.cta + '</button>' +
-        '</div>' +
-      '</section>'
-    );
-    document.getElementById('btn-start').addEventListener('click', function () {
-      state.epreuveIndex = 0;
-      showEpreuveIntro();
-    });
+  function renderIntro() {
+    const ep = currentEpreuve();
+    setScreen('intro', `
+      ${background('game')}
+      ${gameNav(ep)}
+      <div class="intro-area">
+        ${consigne(`
+          ${textBlocks(ep.intro.blocks, ep.intro.width)}
+          <button type="button" class="btn btn--cta" data-action="begin">${esc(ep.intro.cta)}</button>`, 'intro')}
+      </div>`);
+    focus('[data-action="begin"]');
   }
 
-  // ---------- Intro d'épreuve ----------
-
-  function showEpreuveIntro() {
-    var ep = currentEpreuve();
-    state.cardIndex = 0;
-
-    render(
-      '<section class="screen screen--narrative bg-pink">' +
-        hudHtml(ep.stepLabel, ep.title, epreuveCardsLabel(ep)) +
-        '<div class="bracket-panel panel">' +
-          bracketCorners() +
-          '<h3>' + ep.intro.enjeu + '</h3>' +
-          ep.intro.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-          (ep.intro.details
-            ? '<p class="intro-details">' + ep.intro.details.join('<br>') + '</p>'
-            : '') +
-          '<button class="btn btn--primary" id="btn-epreuve-start">' + ep.intro.cta + '</button>' +
-        '</div>' +
-      '</section>'
-    );
-    document.getElementById('btn-epreuve-start').addEventListener('click', showCard);
-  }
-
-  // ---------- Carte (question chronométrée) ----------
-
-  function showCard() {
-    var ep = currentEpreuve();
-    var card = currentCard();
+  function renderQuestion() {
+    const ep = currentEpreuve();
+    const card = currentCard();
     state.answered = false;
 
-    var columnsHtml = ep.columns
-      .map(function (col) {
-        return (
-          '<button class="column-btn" data-col="' + col.id + '">' +
-            capsuleHtml(col) +
-            '<span>' + col.label + '</span>' +
-          '</button>'
-        );
-      })
-      .join('');
+    setScreen('question', `
+      ${background('game')}
+      ${gameNav(ep)}
+      ${consigne(textBlocks(ep.reminder.blocks, ep.reminder.width), 'reminder')}
+      <img class="character" src="${ep.character.src}" alt="${esc(ep.character.alt)}"
+           style="--char-x:${ep.character.x}px; --char-w:${ep.character.width}px">
+      <div class="card-box" data-ref="card" style="--card-w:${ep.card.width}px">
+        <p class="card-box__text" style="--card-text-w:${ep.card.width - 60}px">
+          <span class="card-box__label">${esc(ep.card.label)}</span>
+          <span class="card-box__blank" aria-hidden="true">&nbsp;</span>
+          <strong class="card-box__statement">${esc(card.text)}</strong>
+        </p>
+      </div>
+      <div class="choices" role="group" aria-label="Ta réponse" style="--choice-w:${ep.choices.width}px; --choice-gap:${ep.choices.gap}px">
+        ${ep.columns.map((col) => `
+          <button type="button" class="choice" data-action="answer" data-column="${col.id}">${pill(col)}<span class="choice__label">${esc(col.label)}</span></button>`).join('')}
+      </div>
+      <div class="footer">
+        <div class="bottom-bar">
+          <p class="timer" data-ref="timer" aria-hidden="true">${timerLabel(ep.timerSeconds)}</p>
+          <p class="feedback" data-ref="feedback" role="status" aria-live="polite"></p>
+        </div>
+        <img class="mascot" data-ref="mascot" src="${ep.mascot.src}" alt="" style="--mascot-top:${ep.mascot.top}px" hidden>
+        <button type="button" class="btn btn--continue" data-action="continue" hidden>${esc(DATA.feedback.continueLabel)}${chevron}</button>
+      </div>`);
 
-    var promptText = ep.cardLabel.quoted ? '« ' + card.prompt + ' »' : card.prompt;
-
-    render(
-      '<section class="screen screen--card bg-pink">' +
-        hudHtml(ep.stepLabel, ep.title, epreuveCardsLabel(ep)) +
-        '<div class="card-stage">' +
-          reminderBoxHtml(ep) +
-          '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
-          '<div class="statement-box">' +
-            '<p class="statement-prefix">' + ep.cardLabel.prefix + '</p>' +
-            '<p class="statement-text' + (ep.cardLabel.quoted ? ' statement-text--quoted' : '') + '">' + promptText + '</p>' +
-          '</div>' +
-          '<div class="columns columns--' + ep.columns.length + '">' + columnsHtml + '</div>' +
-          '<div class="timer" id="timer">' + formatTime(ep.timerSeconds) + '</div>' +
-        '</div>' +
-        '<div class="feedback-bar" id="feedback-bar" hidden></div>' +
-      '</section>'
-    );
-
-    Array.prototype.forEach.call(document.querySelectorAll('.column-btn'), function (btn) {
-      btn.addEventListener('click', function () {
-        onAnswer(btn.getAttribute('data-col'));
-      });
-    });
-
-    startTimer(ep.timerSeconds);
+    focus('.choice');
+    startTimer();
   }
 
-  function formatTime(seconds) {
-    var s = Math.max(0, Math.ceil(seconds));
-    var mm = Math.floor(s / 60);
-    var ss = s % 60;
-    return (mm < 10 ? '0' + mm : mm) + ' : ' + (ss < 10 ? '0' + ss : ss);
+  function renderEnd() {
+    const end = DATA.end;
+    const { score, tier } = state.final;
+    setScreen('end', `
+      ${background('home')}
+      ${endNav()}
+      <img class="group-photo" src="img/group.webp" alt="Neo, Trinity, Morpheus et leurs acolytes célèbrent la fin de la mission">
+      ${consigne(`
+        <div class="end-text">
+          <p class="end-text__score">${esc(end.scoreLine(score, MAX_SCORE))}</p>
+          <p class="end-text__message" style="--message-size:${end.messageFontSize[tier]}px">
+            <span class="line">${esc(end.messages[tier])}</span>
+            <span class="line line--blank" aria-hidden="true">&nbsp;</span>
+            ${end.closingLines.map((l) => `<span class="line">${esc(l)}</span>`).join('')}
+          </p>
+        </div>`, 'end')}
+      <button type="button" class="btn btn--continue btn--ranking" data-action="ranking">${esc(end.cta)}${chevron}</button>`);
+    focus('[data-action="ranking"]');
   }
 
-  function startTimer(totalSeconds) {
-    state.cardStartTime = performance.now();
-    var timerEl = document.getElementById('timer');
+  /* ---------- Chrono ---------- */
 
-    function tick() {
-      if (state.answered) return;
-      var elapsed = (performance.now() - state.cardStartTime) / 1000;
-      var remaining = totalSeconds - elapsed;
-      if (remaining <= 0) {
-        if (timerEl) timerEl.textContent = formatTime(0);
-        onAnswer(null); // temps écoulé
+  function startTimer() {
+    stopTimer();
+    const ep = currentEpreuve();
+    const timerEl = stage.querySelector('[data-ref="timer"]');
+    const durationMs = ep.timerSeconds * 1000;
+    let shown = ep.timerSeconds;
+    state.cardStartedAt = performance.now();
+
+    const tick = (now) => {
+      const elapsed = now - state.cardStartedAt;
+      if (elapsed >= durationMs) {
+        timerEl.textContent = timerLabel(0);
+        resolveCard(null);
         return;
       }
-      if (timerEl) timerEl.textContent = formatTime(remaining);
-      state.rafId = requestAnimationFrame(tick);
-    }
-
-    state.rafId = requestAnimationFrame(tick);
+      const remaining = Math.ceil((durationMs - elapsed) / 1000);
+      if (remaining !== shown) {
+        shown = remaining;
+        timerEl.textContent = timerLabel(remaining);
+      }
+      state.timerFrame = requestAnimationFrame(tick);
+    };
+    state.timerFrame = requestAnimationFrame(tick);
   }
 
   function stopTimer() {
-    if (state.rafId) {
-      cancelAnimationFrame(state.rafId);
-      state.rafId = null;
-    }
+    cancelAnimationFrame(state.timerFrame);
+    state.timerFrame = 0;
   }
 
-  // ---------- Réponse & scoring ----------
+  /* ---------- Réponse et feedback ---------- */
 
-  function computeBonus(elapsedSeconds, bonusThirds) {
-    if (elapsedSeconds < bonusThirds[0]) return 3;
-    if (elapsedSeconds < bonusThirds[1]) return 2;
-    return 1;
-  }
-
-  function onAnswer(columnId) {
+  /** @param {string|null} columnId colonne choisie, ou null si le chrono est écoulé */
+  function resolveCard(columnId) {
     if (state.answered) return;
     state.answered = true;
     stopTimer();
 
-    var ep = currentEpreuve();
-    var card = currentCard();
-    var elapsed = (performance.now() - state.cardStartTime) / 1000;
-    var isTimeout = columnId === null;
-    var isCorrect = !isTimeout && columnId === card.correct;
+    const ep = currentEpreuve();
+    const card = currentCard();
+    const elapsed = performance.now() - state.cardStartedAt;
+    const isCorrect = columnId === card.correct;
+    const points = cardPoints(isCorrect, elapsed, ep.timerSeconds, RULES);
 
-    var points = 0;
-    if (isCorrect) {
-      var bonus = computeBonus(elapsed, ep.bonusThirds);
-      points = 7 + bonus;
-      state.streak += 1;
-      state.totalCorrect += 1;
-    } else {
-      state.streak = 0;
-    }
     state.score += points;
+    if (isCorrect) state.correctCount += 1;
+    state.results.push({ epreuve: ep.id, correct: isCorrect, points });
 
-    markColumnButtons(card, isCorrect);
-    updateHudScore();
-    showFeedback(ep, card, isCorrect, isTimeout, points);
-  }
-
-  function updateHudScore() {
-    var scoreEl = document.getElementById('hud-score');
-    if (scoreEl) scoreEl.textContent = pointsLabel(state.score);
-  }
-
-  // Révèle la bonne réponse (vert) et, en cas d'erreur ou de temps écoulé,
-  // toutes les colonnes fausses (rouge).
-  function markColumnButtons(card, isCorrect) {
-    Array.prototype.forEach.call(document.querySelectorAll('.column-btn'), function (btn) {
-      var colId = btn.getAttribute('data-col');
-      btn.disabled = true;
-      if (colId === card.correct) {
-        btn.classList.add('column-btn--correct');
-      } else if (!isCorrect) {
-        btn.classList.add('column-btn--incorrect');
-      }
+    stage.querySelectorAll('.choice').forEach((button) => {
+      const col = button.dataset.column;
+      button.disabled = true;
+      button.classList.toggle('is-correct', col === card.correct);
+      button.classList.toggle('is-wrong', col === columnId && !isCorrect);
     });
-  }
+    stage.querySelector('[data-ref="card"]').classList.add('is-locked');
+    stage.querySelector('[data-ref="score"]').textContent = pointsLabel(state.score);
+    stage.classList.add('is-answered');
 
-  function showFeedback(ep, card, isCorrect, isTimeout, points) {
-    var bar = document.getElementById('feedback-bar');
-    bar.hidden = false;
+    const fb = DATA.feedback;
+    const answer = ep.columns.find((c) => c.id === card.correct).answer;
+    const feedbackEl = stage.querySelector('[data-ref="feedback"]');
 
     if (isCorrect) {
-      bar.className = 'feedback-bar feedback-bar--correct';
-      bar.innerHTML = '<p><span class="feedback-points">+' + points + ' pts. </span>' + card.explanation + '</p>';
-      setTimeout(advanceAfterFeedback, DATA.correctAutoAdvanceMs);
+      feedbackEl.innerHTML = `<span class="feedback__lead feedback__lead--good">${esc(fb.correctPrefix(points))}</span><span class="feedback__body">${esc(card.explanation)}</span>`;
+      state.advanceTimer = window.setTimeout(nextCard, RULES.autoAdvanceMs);
       return;
     }
 
-    var label = isTimeout ? DATA.timeoutLabel : DATA.wrongLabel;
-    bar.className = 'feedback-bar feedback-bar--wrong';
-    bar.innerHTML =
-      '<p><strong>' + label + '</strong> ' + card.explanation + '</p>' +
-      '<button class="btn btn--continue" id="btn-continue"><span>' + DATA.continueLabel + '</span>' + chevronSvg() + '</button>' +
-      mascotHtml(ep);
-    document.getElementById('btn-continue').addEventListener('click', advanceAfterFeedback);
+    const lead = columnId === null ? fb.timeoutPrefix : fb.wrongPrefix;
+    feedbackEl.innerHTML = `<span class="feedback__lead feedback__lead--bad">${esc(lead)}</span><span class="feedback__body">${esc(fb.answerLine(answer, card.explanation))}</span>`;
+    stage.querySelector('[data-ref="mascot"]').hidden = false;
+    stage.querySelector('[data-action="continue"]').hidden = false;
+    focus('[data-action="continue"]');
   }
 
-  function chevronSvg() {
-    return '<svg viewBox="0 0 9 17" width="9" height="17" aria-hidden="true"><path d="M1 1l6.5 7.5L1 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  }
-
-  function advanceAfterFeedback() {
-    var ep = currentEpreuve();
-    state.cardIndex += 1;
-    if (state.cardIndex >= ep.cards.length) {
-      if (state.epreuveIndex >= DATA.epreuves.length - 1) {
-        showBilan();
-      } else {
-        state.epreuveIndex += 1;
-        showEpreuveIntro();
-      }
-    } else {
-      showCard();
+  function nextCard() {
+    window.clearTimeout(state.advanceTimer);
+    const ep = currentEpreuve();
+    state.cardPos += 1;
+    if (state.cardPos < ep.cards.length) {
+      renderQuestion();
+      return;
     }
-  }
-
-  // ---------- Bilan final ----------
-
-  function pickTier(successRate) {
-    var tiers = DATA.bilan.tiers;
-    for (var i = 0; i < tiers.length; i++) {
-      if (successRate >= tiers[i].min) return tiers[i];
+    state.epIndex += 1;
+    if (state.epIndex < DATA.epreuves.length) {
+      startEpreuve();
+      return;
     }
-    return tiers[tiers.length - 1];
+    finishGame();
   }
 
-  function totalCards() {
-    return DATA.epreuves.reduce(function (sum, ep) { return sum + ep.cards.length; }, 0);
+  function startEpreuve() {
+    const ep = currentEpreuve();
+    state.order = shuffle(ep.cards.map((_, i) => i));
+    state.cardPos = 0;
+    renderIntro();
   }
 
-  function showBilan() {
-    var maxScore = DATA.meta.maxScore;
-    var finalScore = Math.min(maxScore, state.score);
-    // Règle obligatoire : un joueur qui termine le jeu a au minimum 1 point.
-    if (finalScore <= 0) finalScore = 1;
+  function finishGame() {
+    const score = finalScore(state.results.map((r) => r.points), RULES);
+    state.final = { score, tier: tierFor(state.correctCount, TOTAL_CARDS, RULES) };
+    renderEnd();
+  }
 
-    var successRate = state.totalCorrect / totalCards();
-    var tier = pickTier(successRate);
-    var d = DATA.bilan;
+  /* ---------- Envoi du score à Bubble (ACCGP) ---------- */
 
-    render(
-      '<section class="screen screen--narrative bg-light screen--bilan">' +
-        hudHtml(null, d.title, 'Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length, { logo: true }) +
-        '<img class="group-photo" src="images/group-photo.webp" alt="">' +
-        '<div class="bracket-panel panel panel--bilan">' +
-          bracketCorners() +
-          '<p class="bilan-score">Score : ' + finalScore + ' / ' + maxScore + ' pts</p>' +
-          '<p>' + tier.message + '</p>' +
-          d.closing.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-          '<button class="btn btn--primary btn--chevron" id="btn-classement">' +
-            '<span>' + d.cta + '</span>' + chevronSvg() +
-          '</button>' +
-        '</div>' +
-      '</section>'
-    );
-
-    window.ACCGP.sendScore(finalScore, maxScore, {
+  function sendFinalScore() {
+    if (state.scoreSent || !state.final) return;
+    state.scoreSent = true;
+    window.ACCGP.sendScore(state.final.score, MAX_SCORE, {
       gameId: DATA.meta.gameId,
-      correctCount: state.totalCorrect,
-      totalCards: totalCards(),
-    });
-
-    document.getElementById('btn-classement').addEventListener('click', function (e) {
-      var btn = e.currentTarget;
-      btn.disabled = true;
-      btn.querySelector('span').textContent = 'Score envoyé ✓';
+      correctAnswers: state.correctCount,
+      totalCards: TOTAL_CARDS,
+      tier: state.final.tier,
+      durationSeconds: Math.round((performance.now() - state.gameStartedAt) / 1000),
+      epreuves: DATA.epreuves.map((ep) => {
+        const rows = state.results.filter((r) => r.epreuve === ep.id);
+        return { id: ep.id, correct: rows.filter((r) => r.correct).length, points: rows.reduce((s, r) => s + r.points, 0) };
+      }),
     });
   }
 
-  document.addEventListener('DOMContentLoaded', showWelcome);
+  /* ---------- Glisser la carte sur une colonne ---------- */
+
+  function setupDrag() {
+    let drag = null;
+
+    const columnAt = (x, y) => [...stage.querySelectorAll('.choice')].find((button) => {
+      const r = button.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    });
+
+    const clearHover = () => stage.querySelectorAll('.choice.is-hover').forEach((b) => b.classList.remove('is-hover'));
+
+    stage.addEventListener('pointerdown', (event) => {
+      const card = event.target.closest('[data-ref="card"]');
+      if (!card || state.answered || event.button !== 0) return;
+      drag = { card, id: event.pointerId, x: event.clientX, y: event.clientY, moving: false };
+      card.setPointerCapture(event.pointerId);
+    });
+
+    stage.addEventListener('pointermove', (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.moving && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      drag.moving = true;
+      const s = effectiveScale();
+      drag.card.classList.add('is-dragging');
+      drag.card.style.setProperty('--drag-x', `${dx / s}px`);
+      drag.card.style.setProperty('--drag-y', `${dy / s}px`);
+      clearHover();
+      const target = columnAt(event.clientX, event.clientY);
+      if (target) target.classList.add('is-hover');
+    });
+
+    const endDrag = (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const { card, moving } = drag;
+      drag = null;
+      clearHover();
+      card.classList.remove('is-dragging');
+      card.style.removeProperty('--drag-x');
+      card.style.removeProperty('--drag-y');
+      if (!moving || event.type === 'pointercancel' || state.answered) return;
+      const target = columnAt(event.clientX, event.clientY);
+      if (target) resolveCard(target.dataset.column);
+    };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+  }
+
+  /* ---------- Actions ---------- */
+
+  const actions = {
+    start() {
+      state.gameStartedAt = performance.now();
+      state.epIndex = 0;
+      startEpreuve();
+    },
+    begin: renderQuestion,
+    answer(button) { resolveCard(button.dataset.column); },
+    continue: nextCard,
+    ranking: sendFinalScore,
+  };
+
+  stage.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action]');
+    if (!button || button.disabled) return;
+    const action = actions[button.dataset.action];
+    if (action) action(button);
+  });
+
+  // Filet de sécurité : si Bubble ferme le jeu sur l'écran de bilan avant le clic
+  // sur « Voir le classement », le score part quand même (une seule fois).
+  window.addEventListener('pagehide', () => {
+    if (state.screen === 'end') sendFinalScore();
+  });
+
+  function preloadImages() {
+    const sources = new Set(['img/bg-game.webp', 'img/group.webp', 'img/logo-adecco.webp']);
+    DATA.epreuves.forEach((ep) => { sources.add(ep.character.src); sources.add(ep.mascot.src); });
+    sources.forEach((src) => { const img = new Image(); img.decoding = 'async'; img.src = src; });
+  }
+
+  function init() {
+    fitStage();
+    window.addEventListener('resize', fitStage);
+    setupDrag();
+    // On attend les polices pour que le premier écran s'affiche directement avec les bonnes métriques.
+    const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
+    Promise.race([fontsReady, new Promise((r) => setTimeout(r, 1500))]).then(() => {
+      renderWelcome();
+      preloadImages();
+    });
+  }
+
+  init();
 })();

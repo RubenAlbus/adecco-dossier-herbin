@@ -1,70 +1,83 @@
-# Le Dossier Herbin — Mini-jeu Adecco #1
+# Le Dossier Herbin · Mini-jeu Adecco n° 1
 
-Mini-jeu custom code pour la plateforme de challenge Bubble d'Albus Factory.
+Mini-jeu « custom code » pour la plateforme de challenges Bubble d'Albus Factory, intégré via le protocole **ACCGP**.
 
-## Stack
+- **Production** : https://adecco-dossier-herbin.vercel.app
+- **Maquette de référence** : Figma « Plateformes_Adecco », page **« Mini Jeu 1_Développement_V2 »** (node `588:231`). La page V1 (`527:477`) est obsolète.
 
-- HTML5 / CSS3 / JavaScript vanilla (aucune dépendance)
-- Protocole ACCGP (Albus Custom Code Game Protocol) pour l'intégration Bubble
-- Hébergé sur Vercel
+## Le jeu
 
-## Dev local
+Mme Herbin cherche un technicien de maintenance autonome. Avec Copilot, le joueur traite le dossier en 3 épreuves de 7 cartes, tirées dans un ordre aléatoire et chronométrées :
 
-```bash
-npx serve -p 3000
+| Épreuve | Colonnes | Chrono |
+|---|---|---|
+| 1. Le partage des rôles | Je la confie à Copilot · Je garde la main | 10 s |
+| 2. Le bon prompt | But · Contexte · Source · Attentes | 12 s |
+| 3. La réponse de Copilot | Fait confirmé · Hypothèse · À vérifier | 9 s |
+
+Le joueur répond en cliquant sur une colonne ou en y glissant la carte. Bonne réponse : feedback vert, carte suivante après 1,6 s. Erreur ou temps écoulé : la bonne colonne passe en vert, la colonne choisie en rouge, la mascotte apparaît avec le bouton « Continuer ».
+
+## Barème (document « Scoring explication » validé le 21/10/2026)
+
+- Bonne réponse : 7 points + bonus de rapidité de +3, +2 ou +1 selon le tiers du chrono. Une carte vaut donc 0, 8, 9 ou 10 points.
+- Mauvaise réponse ou temps écoulé : 0 point. Aucun malus.
+- Score final : somme des 21 cartes, entre **1** (minimum garanti) et **210**.
+- Message du bilan selon le taux de bonnes réponses : 85 % et plus « Dossier maîtrisé », de 60 à 84 % « Bon réflexe global », moins de 60 % « De bons réflexes à consolider ».
+
+## Intégration Bubble (ACCGP)
+
+1. Coller `https://adecco-dossier-herbin.vercel.app` dans le champ `custom_code_url` du challenge.
+2. Bubble ouvre le jeu avec `?userId=…&challengeId=…`.
+3. Le score part vers Bubble **une seule fois**, au clic sur « Voir le classement » du bilan. Le workflow Bubble enregistre les points puis ferme la popup : le joueur retrouve le classement de la plateforme.
+4. Si la popup est fermée sur le bilan sans ce clic, le score part quand même (événement `pagehide`), toujours une seule fois.
+
+Exemple de message reçu par Bubble :
+
+```json
+{
+  "type": "ALBUS_GAME_COMPLETE",
+  "protocol": "ACCGP/1.0",
+  "userId": "user-42",
+  "challengeId": "chal-7",
+  "score": 150,
+  "maxScore": 210,
+  "metadata": { "gameId": "adecco-dossier-herbin", "correctAnswers": 15, "totalCards": 21, "tier": "bon", "durationSeconds": 412, "epreuves": [] }
+}
 ```
 
-Ouvrir `http://localhost:3000?userId=test&challengeId=test-challenge`
+Sans `challengeId` dans l'URL, ACCGP passe en mode dev : rien n'est envoyé, les messages s'affichent dans la console.
 
-En mode dev (sans `challengeId` en URL), ACCGP logge les messages dans la console au lieu de les envoyer à Bubble.
+## Affichage
 
-## Déploiement
-
-```bash
-npx vercel --prod --yes --name adecco-dossier-herbin
-```
-
-URL de prod : `https://adecco-dossier-herbin.vercel.app`
-
-## Intégration Bubble
-
-Coller l'URL Vercel dans le champ `custom_code_url` de l'admin Bubble du challenge concerné. C'est tout.
-
-Le protocole ACCGP gère automatiquement :
-- La réception de `userId` et `challengeId` via URL params
-- L'envoi du score final à Bubble via `postMessage`
-- L'attribution des points par le workflow Bubble standard
-
-## Mécanique
-
-Le joueur incarne un recruteur Adecco qui traite le dossier de Mme Herbin (cliente Rom'Elec), à la recherche d'un électricien autonome. Avec l'aide de « Copilot », il mène 3 épreuves de 7 cartes chronométrées :
-
-1. **La commande** — qualifier chaque critère du besoin client : Indispensable ou Ajustable (10 s/carte).
-2. **Le candidat** — évaluer le profil de Gérard, le candidat : Atout, Écart compensable ou À approfondir (12 s/carte).
-3. **La réponse de Copilot** — trier les affirmations de Copilot sur le dossier : Fait confirmé, Hypothèse ou À vérifier (9 s/carte).
-
-## Scoring
-
-- Bonne réponse : 7 points. Mauvaise réponse ou temps écoulé : 0 point. Jamais de malus.
-- Bonus de rapidité (si bonne réponse uniquement), selon le tiers du chrono où le joueur répond : +3 / +2 / +1.
-- Une carte rapporte donc 0, 8, 9 ou 10 points.
-- Score final = somme des 21 cartes, toujours compris entre 1 (minimum si la partie est terminée) et 210 (maximum).
-- Le message de bilan dépend du taux de réussite (bonnes réponses / 21), selon 3 paliers (≥ 85 %, 60–84 %, < 60 %).
-
-Score max : 210 points.
-
-⚠️ Le contenu des 21 cartes (`js/data.js`) est un premier jet rédigé à partir du scénario Figma et du document de scoring validé le 21/10/2026. À faire relire et valider avant mise en production réelle.
+- **Ordinateur, tablette à l'horizontale, popup Bubble** : chaque écran est une scène de 1638 × 1024 px aux coordonnées exactes de la maquette, mise à l'échelle pour tenir dans la fenêtre.
+- **Téléphone et tablette en portrait, téléphone à l'horizontale** : quand la scène deviendrait illisible (échelle < 0,5), le jeu bascule sur une mise en page verticale avec les mêmes éléments, textes et couleurs (`.is-flow` dans `css/styles.css`).
 
 ## Structure
 
 ```
-./
-├── index.html      # Shell HTML + viewport responsive
-├── css/
-│   └── styles.css  # Design du jeu (DA Figma, responsive mobile/tablette/desktop)
-├── js/
-│   ├── accgp.js    # Pont Bubble (NE PAS MODIFIER)
-│   ├── data.js     # Contenu du jeu (textes, cartes, feedbacks, bilan)
-│   └── game.js     # State machine, timers, scoring, rendu
-└── images/         # Assets exportés depuis Figma (optimisés jpg/webp)
+index.html          page unique
+css/styles.css      styles de la scène, puis mise en page mobile (.is-flow)
+js/accgp.js         pont Bubble, copié du skill albus-bubble-game-scaffold (NE PAS MODIFIER)
+js/data.js          tous les textes et réglages, copiés mot pour mot de la maquette V2
+js/scoring.js       barème en fonctions pures
+js/game.js          écrans, chrono, glisser-déposer, envoi du score
+img/                visuels exportés de Figma (WebP, recadrés comme dans la maquette)
+fonts/              Inter, Michroma, Source Code Pro (auto-hébergées)
+tests/              tests du barème
 ```
+
+Modifier un texte : uniquement dans `js/data.js`, après validation dans Figma.
+
+## Développement
+
+```bash
+npx serve -l 3000
+```
+
+Puis ouvrir `http://localhost:3000/?userId=test&challengeId=test-challenge`.
+
+```bash
+npm test
+```
+
+Le déploiement est automatique : chaque push sur `master` met la production à jour sur Vercel.
