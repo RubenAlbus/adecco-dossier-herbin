@@ -1,0 +1,444 @@
+/* ==========================================================================
+   Le Dossier Herbin — styles
+   Reprise de la direction artistique Figma (Mini Jeu 1_Développement_V2) :
+   thème « matrice », bandeau noir, accents rouge Adecco, panneaux clairs.
+   ========================================================================== */
+
+:root {
+  --red: #e2231a;
+  --red-dark: #b81f2d;
+  --green: #3fae5c;
+  --ink: #1a1a1a;
+  --paper: rgba(248, 247, 243, 0.92);
+  --paper-solid: #f8f7f3;
+  --hud-height: 4.5rem;
+  --radius: 0.75rem;
+  --font-display: 'Rajdhani', 'Inter', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+.app {
+  min-height: 100dvh;
+}
+
+/* ---------- Écrans ---------- */
+
+.screen {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.bg-pink {
+  background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.05)), url('../images/bg-matrix.jpg');
+}
+
+.bg-light {
+  background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0)), url('../images/bg-matrix-light.jpg');
+}
+
+.screen--narrative {
+  justify-content: center;
+  padding: 2rem 1.25rem 3rem;
+}
+
+/* ---------- Bandeau HUD ---------- */
+
+.hud {
+  width: 100%;
+  min-height: var(--hud-height);
+  background: #0b0b0b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.hud__step {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.hud__center {
+  text-align: center;
+  flex: 1 1 auto;
+  min-width: 10rem;
+}
+
+.hud__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.1rem, 1.6vw + 0.6rem, 1.6rem);
+  color: var(--red);
+  letter-spacing: 0.02em;
+}
+
+.hud__cards {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.75;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hud__score {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud--bilan .hud__step {
+  color: var(--red);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* ---------- Panneau narratif ---------- */
+
+.panel {
+  background: var(--paper);
+  backdrop-filter: blur(2px);
+  border-radius: var(--radius);
+  padding: clamp(1.5rem, 3vw, 2.75rem);
+  max-width: 42rem;
+  width: 100%;
+  margin: 2rem auto;
+  text-align: center;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.25);
+}
+
+.panel h1,
+.panel h2,
+.panel h3 {
+  font-family: var(--font-display);
+  margin: 0 0 1rem;
+}
+
+.panel p {
+  margin: 0.6rem 0;
+  line-height: 1.5;
+}
+
+.panel .context {
+  font-weight: 600;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  color: var(--red);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.bullet-list {
+  text-align: left;
+  display: inline-block;
+  margin: 0.75rem auto;
+  padding-left: 1.25rem;
+}
+
+.bullet-list li {
+  margin: 0.25rem 0;
+}
+
+.panel--recap h2 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  color: var(--red);
+}
+
+.score-total {
+  font-weight: 700;
+}
+
+/* ---------- Boutons ---------- */
+
+.btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn--primary {
+  background: var(--red);
+  color: #fff;
+  padding: 0.9rem 2.25rem;
+  font-size: 1.05rem;
+  margin-top: 1.25rem;
+}
+
+.btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn--continue {
+  background: #fff;
+  color: var(--ink);
+  padding: 0.6rem 1.75rem;
+  font-size: 0.95rem;
+  margin-top: 0.75rem;
+}
+
+.btn[disabled] {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ---------- Écran carte / jeu ---------- */
+
+.screen--card {
+  padding-bottom: 6.5rem;
+}
+
+.card-stage {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  max-width: 48rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1.25rem 0;
+}
+
+.card-prompt {
+  background: var(--paper);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.75rem;
+  text-align: center;
+  max-width: 36rem;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.card-prompt p {
+  margin: 0;
+  font-weight: 600;
+  font-size: clamp(1rem, 1.6vw + 0.6rem, 1.3rem);
+}
+
+.character {
+  width: min(60vw, 20rem);
+  max-height: 40vh;
+  object-fit: contain;
+  object-position: bottom;
+  margin: -1rem 0 0;
+  z-index: 1;
+  filter: drop-shadow(0 1rem 2rem rgba(0, 0, 0, 0.35));
+}
+
+.streak-badge {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.25rem;
+  background: rgba(11, 11, 11, 0.75);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  z-index: 3;
+}
+
+.columns {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0.5rem 0 1rem;
+  z-index: 2;
+  flex-wrap: wrap;
+}
+
+.column-btn {
+  flex: 1 1 0;
+  min-width: 8rem;
+  background: #f2f1ec;
+  border: 2px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.6rem;
+  padding: 0.85rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease;
+}
+
+.column-btn:hover:not([disabled]) {
+  transform: translateY(-2px);
+}
+
+.column-btn__pill {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+}
+
+.column-btn--correct {
+  background: var(--green);
+  color: #fff;
+  border-color: transparent;
+}
+
+.column-btn--incorrect {
+  background: var(--red);
+  color: #fff;
+  border-color: transparent;
+}
+
+.column-btn[disabled] {
+  cursor: default;
+}
+
+.timer {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  color: var(--red);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  z-index: 2;
+}
+
+/* ---------- Barre de feedback ---------- */
+
+.feedback-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0b0b0b;
+  color: #fff;
+  padding: 1rem 1.5rem 1.25rem;
+  text-align: center;
+  z-index: 10;
+}
+
+.feedback-bar p {
+  margin: 0;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.feedback-bar--correct p {
+  color: #9be3ab;
+  font-weight: 700;
+}
+
+.feedback-bar--wrong strong {
+  color: var(--red);
+}
+
+/* ---------- Bilan ---------- */
+
+.screen--bilan {
+  justify-content: flex-start;
+}
+
+.group-photo {
+  width: min(70vw, 22rem);
+  margin-top: 1rem;
+}
+
+.bilan-score {
+  color: var(--red);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .hud {
+    padding: 0.75rem 1rem;
+  }
+
+  .character {
+    width: min(55vw, 16rem);
+  }
+}
+
+@media (max-width: 600px) {
+  .hud {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .hud__score {
+    order: 2;
+  }
+
+  .panel {
+    padding: 1.5rem 1.25rem;
+    margin: 1rem auto;
+  }
+
+  .columns {
+    flex-direction: column;
+  }
+
+  .column-btn {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .character {
+    width: min(50vw, 11rem);
+    max-height: 28vh;
+  }
+
+  .card-prompt {
+    padding: 1rem 1.25rem;
+  }
+
+  .group-photo {
+    width: min(80vw, 16rem);
+  }
+}
