@@ -1,13 +1,12 @@
 /**
  * game.js — « Le Dossier Herbin »
  * =================================
- * State machine du jeu : écran d'accueil, 3 épreuves de 7 cartes chronométrées,
- * récap par épreuve, bilan final. Calcule le score selon le barème du document
- * de scoring validé et transmet le résultat à Bubble via ACCGP.sendScore.
+ * State machine du jeu : accueil, 3 épreuves de 7 cartes chronométrées,
+ * bilan final. Calcule le score selon le barème du document de scoring
+ * validé et transmet le résultat à Bubble via ACCGP.sendScore.
  *
- * La structure de chaque écran (bandeau, cadre à coins rouges, bandeau de
- * rappel du contexte, bulle du collègue Copilot, etc.) reproduit à l'identique
- * les écrans de la maquette Figma « Mini Jeu 1_Développement_V2 ».
+ * Chaque écran reproduit à l'identique les écrans de la page Figma
+ * « Mini Jeu 1_Développement_V2 » (textes, options, couleurs, mise en page).
  */
 'use strict';
 
@@ -21,7 +20,6 @@
     score: 0,
     streak: 0,
     totalCorrect: 0,
-    epreuveCorrect: 0,
     cardStartTime: 0,
     rafId: null,
     answered: false,
@@ -39,10 +37,12 @@
     return currentEpreuve().cards[state.cardIndex];
   }
 
+  function pointsLabel(n) {
+    return n <= 1 ? n + ' point' : n + ' points';
+  }
+
   // ---------- Petits composants réutilisés sur plusieurs écrans ----------
 
-  // Cadre avec les 4 coins rouges façon viseur, utilisé pour tous les
-  // panneaux narratifs et le bandeau de rappel de contexte.
   function bracketCorners() {
     return (
       '<img class="corner corner--tl" src="images/corner-tl.svg" alt="" aria-hidden="true">' +
@@ -59,7 +59,7 @@
       : '<span class="hud__step">' + stepLabel + '</span>';
     var right = options.logo
       ? '<img class="hud__logo hud__logo--spacer" src="images/adecco-logo.webp" alt="" aria-hidden="true">'
-      : '<span class="hud__score" id="hud-score">' + state.score + ' points</span>';
+      : '<span class="hud__score" id="hud-score">' + pointsLabel(state.score) + '</span>';
     return (
       '<header class="hud">' +
         left +
@@ -72,33 +72,25 @@
     );
   }
 
-  // Bandeau de rappel du contexte de l'épreuve, affiché en haut des écrans
-  // de carte (reprend le titre + contexte de l'intro, ou à défaut les deux
-  // paragraphes d'intro tels quels).
+  function epreuveCardsLabel(ep) {
+    return 'Cartes : ' + (state.cardIndex + 1) + ' / ' + ep.cards.length;
+  }
+
+  // Bandeau de rappel affiché en haut des écrans de carte : reprend
+  // l'enjeu + le texte condensé défini pour chaque épreuve.
   function reminderBoxHtml(ep) {
-    var inner;
-    if (ep.intro.title) {
-      inner =
-        '<h3>' + ep.intro.title + '</h3>' +
-        '<p>' + ep.intro.context.join('<br>') + '</p>';
-    } else {
-      inner = ep.intro.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('');
-    }
+    var r = ep.reminder;
+    var inner = '<h3>' + r.enjeu + '</h3>' + r.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('');
     return '<div class="bracket-panel reminder-box">' + bracketCorners() + inner + '</div>';
   }
 
-  function mascotBubbleHtml(ep, text) {
-    return (
-      '<div class="mascot-bubble">' +
-        '<div class="mascot-bubble__text">' + text + '</div>' +
-        '<img class="mascot-bubble__tail" src="images/bubble-tail.svg" alt="" aria-hidden="true">' +
-        '<div class="mascot-bubble__portrait mascot-bubble__portrait--pose' + ep.mascotPose + '"></div>' +
-      '</div>'
-    );
+  function capsuleHtml(col) {
+    var rotateClass = col.rotate === 'neg' ? ' capsule--rotate-neg' : col.rotate === 'pos' ? ' capsule--rotate-pos' : '';
+    return '<span class="capsule capsule--' + col.capsule + rotateClass + '" aria-hidden="true"></span>';
   }
 
-  function pickRandom(list) {
-    return list[Math.floor(Math.random() * list.length)];
+  function mascotHtml(ep) {
+    return '<div class="mascot-pose mascot-pose--pose' + (state.epreuveIndex % 3) + '"></div>';
   }
 
   // ---------- Écran d'accueil ----------
@@ -107,14 +99,12 @@
     var d = DATA.intro;
     render(
       '<section class="screen screen--narrative bg-light">' +
-        '<div class="bracket-panel panel">' +
+        '<div class="bracket-panel panel panel--welcome">' +
           bracketCorners() +
+          '<div class="avatar-circle"><img src="images/char-morpheus.webp" alt=""></div>' +
           '<p class="eyebrow">' + d.eyebrow + '</p>' +
           '<h1>' + d.title + '</h1>' +
           d.paragraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-          '<ul class="bullet-list">' +
-            d.bullets.map(function (b) { return '<li>' + b + '</li>'; }).join('') +
-          '</ul>' +
           d.closingParagraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
           '<button class="btn btn--primary" id="btn-start">' + d.cta + '</button>' +
         '</div>' +
@@ -131,17 +121,16 @@
   function showEpreuveIntro() {
     var ep = currentEpreuve();
     state.cardIndex = 0;
-    state.epreuveCorrect = 0;
 
     render(
       '<section class="screen screen--narrative bg-pink">' +
-        hudHtml(ep.stepLabel, ep.title, 'Cartes : 0 / ' + ep.cards.length) +
+        hudHtml(ep.stepLabel, ep.title, epreuveCardsLabel(ep)) +
         '<div class="bracket-panel panel">' +
           bracketCorners() +
+          '<h3>' + ep.intro.enjeu + '</h3>' +
           ep.intro.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-          (ep.intro.title ? '<h3>' + ep.intro.title + '</h3>' : '') +
-          (ep.intro.context.length
-            ? '<p class="context">' + ep.intro.context.join('<br>') + '</p>'
+          (ep.intro.details
+            ? '<p class="intro-details">' + ep.intro.details.join('<br>') + '</p>'
             : '') +
           '<button class="btn btn--primary" id="btn-epreuve-start">' + ep.intro.cta + '</button>' +
         '</div>' +
@@ -160,30 +149,27 @@
     var columnsHtml = ep.columns
       .map(function (col) {
         return (
-          '<button class="column-btn column-btn--' + col.pill + '" data-col="' + col.id + '">' +
-            '<img class="column-btn__pill' + (col.rotated ? ' column-btn__pill--rotated' : '') + '" src="images/pill-' + col.pill + '.webp" alt="">' +
+          '<button class="column-btn" data-col="' + col.id + '">' +
+            capsuleHtml(col) +
             '<span>' + col.label + '</span>' +
           '</button>'
         );
       })
       .join('');
 
-    var promptText = ep.cardLabel.quoted ? '“' + card.prompt + '”' : card.prompt;
+    var promptText = ep.cardLabel.quoted ? '« ' + card.prompt + ' »' : card.prompt;
 
     render(
       '<section class="screen screen--card bg-pink">' +
-        hudHtml(ep.stepLabel, ep.title, 'Cartes : ' + state.cardIndex + ' / ' + ep.cards.length) +
+        hudHtml(ep.stepLabel, ep.title, epreuveCardsLabel(ep)) +
         '<div class="card-stage">' +
           reminderBoxHtml(ep) +
-          '<div class="stage-middle">' +
-            '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
-            '<div class="statement-box">' +
-              '<p class="statement-prefix">' + ep.cardLabel.prefix + '</p>' +
-              '<p class="statement-text' + (ep.cardLabel.quoted ? ' statement-text--quoted' : '') + '">' + promptText + '</p>' +
-            '</div>' +
+          '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
+          '<div class="statement-box">' +
+            '<p class="statement-prefix">' + ep.cardLabel.prefix + '</p>' +
+            '<p class="statement-text' + (ep.cardLabel.quoted ? ' statement-text--quoted' : '') + '">' + promptText + '</p>' +
           '</div>' +
-          '<div class="streak-badge" id="streak-badge">Série : ' + state.streak + '</div>' +
-          '<div class="columns">' + columnsHtml + '</div>' +
+          '<div class="columns columns--' + ep.columns.length + '">' + columnsHtml + '</div>' +
           '<div class="timer" id="timer">' + formatTime(ep.timerSeconds) + '</div>' +
         '</div>' +
         '<div class="feedback-bar" id="feedback-bar" hidden></div>' +
@@ -258,26 +244,23 @@
       points = 7 + bonus;
       state.streak += 1;
       state.totalCorrect += 1;
-      state.epreuveCorrect += 1;
     } else {
       state.streak = 0;
     }
     state.score += points;
 
     markColumnButtons(card, isCorrect);
-    updateHudLiveValues();
+    updateHudScore();
     showFeedback(ep, card, isCorrect, isTimeout, points);
   }
 
-  function updateHudLiveValues() {
+  function updateHudScore() {
     var scoreEl = document.getElementById('hud-score');
-    if (scoreEl) scoreEl.textContent = state.score + ' points';
-    var streakEl = document.getElementById('streak-badge');
-    if (streakEl) streakEl.textContent = 'Série : ' + state.streak;
+    if (scoreEl) scoreEl.textContent = pointsLabel(state.score);
   }
 
-  // Révèle la bonne réponse (vert) et toutes les mauvaises colonnes (rouge),
-  // que le joueur se soit trompé ou n'ait pas répondu à temps.
+  // Révèle la bonne réponse (vert) et, en cas d'erreur ou de temps écoulé,
+  // toutes les colonnes fausses (rouge).
   function markColumnButtons(card, isCorrect) {
     Array.prototype.forEach.call(document.querySelectorAll('.column-btn'), function (btn) {
       var colId = btn.getAttribute('data-col');
@@ -296,72 +279,47 @@
 
     if (isCorrect) {
       bar.className = 'feedback-bar feedback-bar--correct';
-      bar.innerHTML = '<p>+' + points + ' pts. ' + card.explanation + '</p>';
+      bar.innerHTML = '<p><span class="feedback-points">+' + points + ' pts. </span>' + card.explanation + '</p>';
       setTimeout(advanceAfterFeedback, DATA.correctAutoAdvanceMs);
       return;
     }
 
     var label = isTimeout ? DATA.timeoutLabel : DATA.wrongLabel;
     bar.className = 'feedback-bar feedback-bar--wrong';
-    bar.innerHTML = '<p><strong>' + label + '.</strong>' + card.explanation + '</p>';
-    bar.addEventListener('click', advanceAfterFeedback, { once: true });
+    bar.innerHTML =
+      '<p><strong>' + label + '</strong> ' + card.explanation + '</p>' +
+      '<button class="btn btn--continue" id="btn-continue"><span>' + DATA.continueLabel + '</span>' + chevronSvg() + '</button>' +
+      mascotHtml(ep);
+    document.getElementById('btn-continue').addEventListener('click', advanceAfterFeedback);
+  }
 
-    if (ep.showMascotOnFeedback) {
-      var reactionPool = isTimeout ? DATA.mascotReactions.timeout : DATA.mascotReactions.wrong;
-      var stage = document.querySelector('.stage-middle');
-      if (stage) stage.insertAdjacentHTML('beforeend', mascotBubbleHtml(ep, pickRandom(reactionPool)));
-    }
+  function chevronSvg() {
+    return '<svg viewBox="0 0 9 17" width="9" height="17" aria-hidden="true"><path d="M1 1l6.5 7.5L1 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   function advanceAfterFeedback() {
     var ep = currentEpreuve();
     state.cardIndex += 1;
     if (state.cardIndex >= ep.cards.length) {
-      showEpreuveRecap();
-    } else {
-      showCard();
-    }
-  }
-
-  // ---------- Récap d'épreuve ----------
-
-  function showEpreuveRecap() {
-    var ep = currentEpreuve();
-    var isLastEpreuve = state.epreuveIndex >= DATA.epreuves.length - 1;
-
-    render(
-      '<section class="screen screen--narrative bg-pink">' +
-        hudHtml(ep.stepLabel, ep.title, 'Cartes : ' + ep.cards.length + ' / ' + ep.cards.length) +
-        '<div class="bracket-panel panel panel--recap">' +
-          bracketCorners() +
-          '<h2>' + state.epreuveCorrect + ' / ' + ep.cards.length + '</h2>' +
-          '<p>' + state.epreuveCorrect + ' ' + ep.recapWording.good + '</p>' +
-          '<p class="score-total">Score total : ' + state.score + ' points</p>' +
-          '<button class="btn btn--primary" id="btn-next">' +
-            (isLastEpreuve ? 'Voir le bilan' : 'Épreuve suivante') +
-          '</button>' +
-        '</div>' +
-      '</section>'
-    );
-
-    document.getElementById('btn-next').addEventListener('click', function () {
-      if (isLastEpreuve) {
+      if (state.epreuveIndex >= DATA.epreuves.length - 1) {
         showBilan();
       } else {
         state.epreuveIndex += 1;
         showEpreuveIntro();
       }
-    });
+    } else {
+      showCard();
+    }
   }
 
   // ---------- Bilan final ----------
 
-  function pickTierMessage(successRate) {
+  function pickTier(successRate) {
     var tiers = DATA.bilan.tiers;
     for (var i = 0; i < tiers.length; i++) {
-      if (successRate >= tiers[i].min) return tiers[i].message;
+      if (successRate >= tiers[i].min) return tiers[i];
     }
-    return tiers[tiers.length - 1].message;
+    return tiers[tiers.length - 1];
   }
 
   function totalCards() {
@@ -375,21 +333,20 @@
     if (finalScore <= 0) finalScore = 1;
 
     var successRate = state.totalCorrect / totalCards();
-    var message = pickTierMessage(successRate);
+    var tier = pickTier(successRate);
     var d = DATA.bilan;
 
     render(
       '<section class="screen screen--narrative bg-light screen--bilan">' +
-        hudHtml(d.eyebrow, d.title, 'Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length, { logo: true }) +
+        hudHtml(null, d.title, 'Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length, { logo: true }) +
         '<img class="group-photo" src="images/group-photo.webp" alt="">' +
         '<div class="bracket-panel panel panel--bilan">' +
           bracketCorners() +
-          '<h3 class="bilan-score">' + finalScore + ' / ' + maxScore + ' pts</h3>' +
-          '<p>' + message + '</p>' +
-          '<p>' + d.closing + '</p>' +
+          '<p class="bilan-score">Score : ' + finalScore + ' / ' + maxScore + ' pts</p>' +
+          '<p>' + tier.message + '</p>' +
+          d.closing.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
           '<button class="btn btn--primary btn--chevron" id="btn-classement">' +
-            '<span>' + d.cta + '</span>' +
-            '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '<span>' + d.cta + '</span>' + chevronSvg() +
           '</button>' +
         '</div>' +
       '</section>'
