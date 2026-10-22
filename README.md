@@ -47,6 +47,10 @@ Exemple de message reçu par Bubble :
 
 Sans `challengeId` dans l'URL, ACCGP passe en mode dev : rien n'est envoyé, les messages s'affichent dans la console.
 
+## Écart volontaire avec la maquette
+
+À la demande de la cliente (22/10/2026), les panneaux blancs de consigne sont plus lisibles que dans le Figma : blanc à 80 % avec fond flouté (au lieu de 50 % sans flou), texte en Inter Medium 16 px (au lieu de 14 px) et titres en 19 px (au lieu de 18 px). Tout le reste suit la maquette V2. Réglages : `--panel` et `--panel-blur` dans `css/styles.css`.
+
 ## Affichage
 
 - **Ordinateur, tablette à l'horizontale, popup Bubble** : chaque écran est une scène de 1638 × 1024 px aux coordonnées exactes de la maquette, mise à l'échelle pour tenir dans la fenêtre.
