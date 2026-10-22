@@ -6,8 +6,9 @@
  *
  * ⚠️ Les 21 cartes ci-dessous (texte, bonne réponse, feedback) sont un
  * premier jet à faire relire et valider avant mise en production réelle.
- * Tout le reste (barème, chronos, seuils de bonus, messages de bilan) est
- * repris tel quel du document de scoring validé.
+ * Tout le reste (barème, chronos, seuils de bonus, messages de bilan,
+ * textes narratifs, structure des écrans) est repris tel quel de la
+ * maquette Figma validée.
  */
 'use strict';
 
@@ -41,6 +42,14 @@ window.GAME_DATA = {
     cta: 'Commencer la mission',
   },
 
+  // Courtes relances affichées dans la bulle du collègue (Copilot) en cas
+  // de mauvaise réponse / temps écoulé. Purement décoratif, à ne pas
+  // confondre avec l'explication factuelle affichée dans le bandeau bas.
+  mascotReactions: {
+    wrong: ['Aïe, pas celle-là !', 'Petit piège, hein ?', 'Pas tout à fait…'],
+    timeout: ['Le temps a filé !', 'Trop lent, cette fois.', 'Chrono à zéro !'],
+  },
+
   epreuves: [
     {
       id: 'commande',
@@ -49,18 +58,21 @@ window.GAME_DATA = {
       character: 'neo',
       timerSeconds: 10,
       bonusThirds: [10 / 3, 20 / 3], // < 3,33 s / < 6,67 s / < 10 s
+      showMascotOnFeedback: false,
+      mascotPose: 0,
       intro: {
-        title: 'Le besoin de Mme Herbin (Rom’Elec)',
-        paragraphs: [
+        lead: [
           'Mme Herbin a besoin d’un électricien, et vite.',
           'Pour chaque critère, décide : est-il indispensable pour cette mission, ou peut-il s’ajuster avec elle ?',
         ],
+        title: 'Le besoin de Mme Herbin (Rom’Elec)',
         context: [
           'Un électricien autonome pour poser des chemins de câbles et tirer des câbles dans un supermarché.',
           'Il intégrera une petite équipe et doit démarrer rapidement.',
         ],
         cta: 'Commencer la mission',
       },
+      cardLabel: { prefix: 'Pour cette mission, le critère est :', quoted: false },
       columns: [
         { id: 'indispensable', label: 'Indispensable', pill: 'blue' },
         { id: 'ajustable', label: 'Ajustable', pill: 'red' },
@@ -111,15 +123,18 @@ window.GAME_DATA = {
       character: 'trinity',
       timerSeconds: 12,
       bonusThirds: [4, 8], // < 4 s / < 8 s / < 12 s
+      showMascotOnFeedback: true,
+      mascotPose: 1,
       intro: {
-        title: 'Gérard, électricien depuis plus de 20 ans',
-        paragraphs: [
+        lead: [
           'Tu as rencontré Gérard, électricien depuis plus de 20 ans : un bon profil, avec quelques points à approfondir.',
           'Pour chaque élément de son profil, décide : atout, écart compensable ou point à approfondir ?',
         ],
+        title: null,
         context: [],
         cta: 'Commencer la mission',
       },
+      cardLabel: { prefix: 'Pour cette mission, le critère est :', quoted: false },
       columns: [
         { id: 'atout', label: 'Atout', pill: 'blue' },
         { id: 'ecart', label: 'Écart compensable', pill: 'pink' },
@@ -171,15 +186,18 @@ window.GAME_DATA = {
       character: 'morpheus',
       timerSeconds: 9,
       bonusThirds: [3, 6], // < 3 s / < 6 s / < 9 s
+      showMascotOnFeedback: true,
+      mascotPose: 2,
       intro: {
-        title: 'La synthèse de Copilot',
-        paragraphs: [
+        lead: [
           'Tu as transmis à Copilot la demande client, le CV de Gérard et ta synthèse d’entretien.',
           'Il t’aide à aller plus vite, mais c’est toi qui décides : trie ses affirmations, fait confirmé, hypothèse ou info à vérifier ?',
         ],
+        title: null,
         context: [],
         cta: 'Commencer la mission',
       },
+      cardLabel: { prefix: 'Copilot affirme :', quoted: true },
       columns: [
         { id: 'confirme', label: 'Fait confirmé', pill: 'blue' },
         { id: 'hypothese', label: 'Hypothèse', pill: 'pink' },
@@ -232,6 +250,7 @@ window.GAME_DATA = {
   correctAutoAdvanceMs: 1600,
 
   bilan: {
+    eyebrow: 'Adecco',
     title: 'Félicitations',
     closing: 'On se retrouve bientôt pour un nouveau défi Adecco.',
     tiers: [

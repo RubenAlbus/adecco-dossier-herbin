@@ -4,6 +4,10 @@
  * State machine du jeu : écran d'accueil, 3 épreuves de 7 cartes chronométrées,
  * récap par épreuve, bilan final. Calcule le score selon le barème du document
  * de scoring validé et transmet le résultat à Bubble via ACCGP.sendScore.
+ *
+ * La structure de chaque écran (bandeau, cadre à coins rouges, bandeau de
+ * rappel du contexte, bulle du collègue Copilot, etc.) reproduit les écrans
+ * de la maquette Figma « Mini Jeu 1_Développement_V2 ».
  */
 'use strict';
 
@@ -19,7 +23,6 @@
     totalCorrect: 0,
     epreuveCorrect: 0,
     cardStartTime: 0,
-    timerId: null,
     rafId: null,
     answered: false,
   };
@@ -36,13 +39,72 @@
     return currentEpreuve().cards[state.cardIndex];
   }
 
+  // ---------- Petits composants réutilisés sur plusieurs écrans ----------
+
+  // Cadre avec les 4 coins rouges façon viseur, utilisé pour tous les
+  // panneaux narratifs et le bandeau de rappel de contexte.
+  function bracketCorners() {
+    return (
+      '<i class="corner corner--tl" aria-hidden="true"></i>' +
+      '<i class="corner corner--tr" aria-hidden="true"></i>' +
+      '<i class="corner corner--bl" aria-hidden="true"></i>' +
+      '<i class="corner corner--br" aria-hidden="true"></i>'
+    );
+  }
+
+  function hudHtml(stepLabel, title, cardsLabel, options) {
+    options = options || {};
+    var logo = options.logo
+      ? '<img class="hud__logo" src="images/adecco-logo.webp" alt="Adecco">'
+      : '<span class="hud__step">' + stepLabel + '</span>';
+    return (
+      '<header class="hud' + (options.modifier ? ' ' + options.modifier : '') + '">' +
+        logo +
+        '<div class="hud__center">' +
+          '<h2 class="hud__title">' + title + '</h2>' +
+          (cardsLabel ? '<span class="hud__cards">' + cardsLabel + '</span>' : '') +
+        '</div>' +
+        (options.hideScore ? '<span class="hud__score"></span>' : '<span class="hud__score" id="hud-score">' + state.score + ' points</span>') +
+      '</header>'
+    );
+  }
+
+  // Bandeau de rappel du contexte de l'épreuve, affiché en haut des écrans
+  // de carte et de feedback (reprend le titre + contexte de l'intro, ou à
+  // défaut les deux paragraphes d'intro tels quels).
+  function reminderBoxHtml(ep) {
+    var inner;
+    if (ep.intro.title) {
+      inner =
+        '<h3>' + ep.intro.title + '</h3>' +
+        '<p>' + ep.intro.context.join('<br>') + '</p>';
+    } else {
+      inner = ep.intro.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('');
+    }
+    return '<div class="bracket-panel reminder-box">' + bracketCorners() + inner + '</div>';
+  }
+
+  function mascotBubbleHtml(ep, text) {
+    return (
+      '<div class="mascot-bubble">' +
+        '<div class="mascot-bubble__text">' + text + '</div>' +
+        '<div class="mascot-bubble__portrait mascot-bubble__portrait--pose' + ep.mascotPose + '"></div>' +
+      '</div>'
+    );
+  }
+
+  function pickRandom(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
   // ---------- Écran d'accueil ----------
 
   function showWelcome() {
     var d = DATA.intro;
     render(
       '<section class="screen screen--narrative bg-light">' +
-        '<div class="panel">' +
+        '<div class="bracket-panel panel">' +
+          bracketCorners() +
           '<p class="eyebrow">' + d.eyebrow + '</p>' +
           '<h1>' + d.title + '</h1>' +
           d.paragraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
@@ -69,10 +131,11 @@
 
     render(
       '<section class="screen screen--narrative bg-pink">' +
-        hudHtml(ep, 0) +
-        '<div class="panel">' +
-          (ep.intro.title ? '<h2>' + ep.intro.title + '</h2>' : '') +
-          ep.intro.paragraphs.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
+        hudHtml(ep.stepLabel, ep.title, 'Cartes : 0 / ' + ep.cards.length) +
+        '<div class="bracket-panel panel">' +
+          bracketCorners() +
+          ep.intro.lead.map(function (p) { return '<p>' + p + '</p>'; }).join('') +
+          (ep.intro.title ? '<h3>' + ep.intro.title + '</h3>' : '') +
           (ep.intro.context.length
             ? '<p class="context">' + ep.intro.context.join('<br>') + '</p>'
             : '') +
@@ -81,20 +144,6 @@
       '</section>'
     );
     document.getElementById('btn-epreuve-start').addEventListener('click', showCard);
-  }
-
-  function hudHtml(ep, cardCountOverride) {
-    var cardCount = typeof cardCountOverride === 'number' ? cardCountOverride : state.cardIndex;
-    return (
-      '<header class="hud">' +
-        '<span class="hud__step">' + ep.stepLabel + '</span>' +
-        '<div class="hud__center">' +
-          '<h2 class="hud__title">' + ep.title + '</h2>' +
-          '<span class="hud__cards">Cartes : ' + cardCount + ' / ' + ep.cards.length + '</span>' +
-        '</div>' +
-        '<span class="hud__score" id="hud-score">' + state.score + ' points</span>' +
-      '</header>'
-    );
   }
 
   // ---------- Carte (question chronométrée) ----------
@@ -115,12 +164,20 @@
       })
       .join('');
 
+    var promptText = ep.cardLabel.quoted ? '“' + card.prompt + '”' : card.prompt;
+
     render(
       '<section class="screen screen--card bg-pink">' +
-        hudHtml(ep) +
+        hudHtml(ep.stepLabel, ep.title, 'Cartes : ' + state.cardIndex + ' / ' + ep.cards.length) +
         '<div class="card-stage">' +
-          '<div class="card-prompt"><p>' + card.prompt + '</p></div>' +
-          '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
+          reminderBoxHtml(ep) +
+          '<div class="stage-middle">' +
+            '<div class="statement-box">' +
+              '<p class="statement-prefix">' + ep.cardLabel.prefix + '</p>' +
+              '<p class="statement-text' + (ep.cardLabel.quoted ? ' statement-text--quoted' : '') + '">' + promptText + '</p>' +
+            '</div>' +
+            '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
+          '</div>' +
           '<div class="streak-badge" id="streak-badge">Série : ' + state.streak + '</div>' +
           '<div class="columns">' + columnsHtml + '</div>' +
           '<div class="timer" id="timer">' + formatTime(ep.timerSeconds) + '</div>' +
@@ -249,6 +306,12 @@
       '<p><strong>' + label + '.</strong> Réponse : ' + columnLabel(ep, card.correct) + '. ' + card.explanation + '</p>' +
       '<button class="btn btn--continue" id="btn-continue">' + DATA.continueLabel + '</button>';
     document.getElementById('btn-continue').addEventListener('click', advanceAfterFeedback);
+
+    if (ep.showMascotOnFeedback) {
+      var reactionPool = isTimeout ? DATA.mascotReactions.timeout : DATA.mascotReactions.wrong;
+      var stage = document.querySelector('.stage-middle');
+      if (stage) stage.insertAdjacentHTML('beforeend', mascotBubbleHtml(ep, pickRandom(reactionPool)));
+    }
   }
 
   function advanceAfterFeedback() {
@@ -269,8 +332,9 @@
 
     render(
       '<section class="screen screen--narrative bg-pink">' +
-        hudHtml(ep, ep.cards.length) +
-        '<div class="panel panel--recap">' +
+        hudHtml(ep.stepLabel, ep.title, 'Cartes : ' + ep.cards.length + ' / ' + ep.cards.length) +
+        '<div class="bracket-panel panel panel--recap">' +
+          bracketCorners() +
           '<h2>' + state.epreuveCorrect + ' / ' + ep.cards.length + '</h2>' +
           '<p>' + state.epreuveCorrect + ' ' + ep.recapWording.good + '</p>' +
           '<p class="score-total">Score total : ' + state.score + ' points</p>' +
@@ -317,17 +381,17 @@
 
     render(
       '<section class="screen screen--narrative bg-light screen--bilan">' +
-        '<header class="hud hud--bilan">' +
-          '<span class="hud__step">Adecco</span>' +
-          '<h2 class="hud__title">' + d.title + '</h2>' +
-          '<span class="hud__cards">Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length + '</span>' +
-        '</header>' +
+        hudHtml(d.eyebrow, d.title, 'Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length, { logo: true, hideScore: true, modifier: 'hud--bilan' }) +
         '<img class="group-photo" src="images/group-photo.webp" alt="">' +
-        '<div class="panel">' +
+        '<div class="bracket-panel panel panel--bilan">' +
+          bracketCorners() +
           '<h3 class="bilan-score">' + finalScore + ' / ' + maxScore + ' pts</h3>' +
           '<p>' + message + '</p>' +
           '<p>' + d.closing + '</p>' +
-          '<button class="btn btn--primary" id="btn-classement">' + d.cta + '</button>' +
+          '<button class="btn btn--primary btn--chevron" id="btn-classement">' +
+            '<span>' + d.cta + '</span>' +
+            '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button>' +
         '</div>' +
       '</section>'
     );
@@ -339,8 +403,9 @@
     });
 
     document.getElementById('btn-classement').addEventListener('click', function (e) {
-      e.target.disabled = true;
-      e.target.textContent = 'Score envoyé ✓';
+      var btn = e.currentTarget;
+      btn.disabled = true;
+      btn.querySelector('span').textContent = 'Score envoyé ✓';
     });
   }
 

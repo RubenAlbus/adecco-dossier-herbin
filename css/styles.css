@@ -1,7 +1,8 @@
 /* ==========================================================================
    Le Dossier Herbin — styles
-   Reprise de la direction artistique Figma (Mini Jeu 1_Développement_V2) :
-   thème « matrice », bandeau noir, accents rouge Adecco, panneaux clairs.
+   Reprise fidèle des écrans Figma (Mini Jeu 1_Développement_V2) : fond
+   « matrice », bandeau noir, cadres à coins rouges façon viseur, bandeau de
+   rappel de contexte, bulle du collègue Copilot, bilan avec photo de groupe.
    ========================================================================== */
 
 :root {
@@ -11,9 +12,10 @@
   --ink: #1a1a1a;
   --paper: rgba(248, 247, 243, 0.92);
   --paper-solid: #f8f7f3;
+  --statement-bg: linear-gradient(135deg, rgba(26, 26, 26, 0.92), rgba(70, 70, 70, 0.78));
   --hud-height: 4.5rem;
   --radius: 0.75rem;
-  --font-display: 'Rajdhani', 'Inter', sans-serif;
+  --font-display: 'Baloo 2', 'Inter', sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -90,6 +92,12 @@ button {
   white-space: nowrap;
 }
 
+.hud__logo {
+  height: 1.3rem;
+  width: auto;
+  display: block;
+}
+
 .hud__center {
   text-align: center;
   flex: 1 1 auto;
@@ -116,13 +124,27 @@ button {
 .hud__score {
   font-weight: 600;
   white-space: nowrap;
+  min-width: 1px;
 }
 
-.hud--bilan .hud__step {
-  color: var(--red);
-  font-weight: 700;
-  font-size: 1.1rem;
+/* ---------- Cadre à coins rouges (façon viseur) ---------- */
+
+.bracket-panel {
+  position: relative;
 }
+
+.corner {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--red);
+  pointer-events: none;
+}
+
+.corner--tl { top: -0.5rem; left: -0.5rem; border-right: none; border-bottom: none; }
+.corner--tr { top: -0.5rem; right: -0.5rem; border-left: none; border-bottom: none; }
+.corner--bl { bottom: -0.5rem; left: -0.5rem; border-right: none; border-top: none; }
+.corner--br { bottom: -0.5rem; right: -0.5rem; border-left: none; border-top: none; }
 
 /* ---------- Panneau narratif ---------- */
 
@@ -133,7 +155,7 @@ button {
   padding: clamp(1.5rem, 3vw, 2.75rem);
   max-width: 42rem;
   width: 100%;
-  margin: 2rem auto;
+  margin: 2.5rem auto;
   text-align: center;
   box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.25);
 }
@@ -150,8 +172,13 @@ button {
   line-height: 1.5;
 }
 
+.panel h3 {
+  font-size: 1.15rem;
+  margin-top: 1.25rem;
+}
+
 .panel .context {
-  font-weight: 600;
+  margin-top: 0.1rem;
 }
 
 .eyebrow {
@@ -205,10 +232,17 @@ button {
   padding: 0.9rem 2.25rem;
   font-size: 1.05rem;
   margin-top: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .btn--primary:hover {
   filter: brightness(1.08);
+}
+
+.btn--chevron svg {
+  color: #fff;
 }
 
 .btn--continue {
@@ -222,6 +256,31 @@ button {
 .btn[disabled] {
   opacity: 0.7;
   cursor: default;
+}
+
+/* ---------- Bandeau de rappel de contexte (écrans carte) ---------- */
+
+.reminder-box {
+  background: var(--paper);
+  border-radius: var(--radius);
+  padding: 1rem 1.75rem;
+  text-align: center;
+  max-width: 40rem;
+  width: 100%;
+  margin: 1.75rem auto 0;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.18);
+}
+
+.reminder-box h3 {
+  font-family: var(--font-display);
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.reminder-box p {
+  margin: 0.2rem 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 /* ---------- Écran carte / jeu ---------- */
@@ -238,38 +297,61 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem 1.25rem 0;
+  padding: 0 1.25rem;
 }
 
-.card-prompt {
-  background: var(--paper);
+.stage-middle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.statement-box {
+  background: var(--statement-bg);
+  color: #fff;
   border-radius: var(--radius);
-  padding: 1.25rem 1.75rem;
+  padding: 0.9rem 1.75rem;
   text-align: center;
-  max-width: 36rem;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+  max-width: 30rem;
+  margin-top: 1.25rem;
   z-index: 2;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25);
 }
 
-.card-prompt p {
+.statement-prefix {
   margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.statement-text {
+  margin: 0.3rem 0 0;
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 1.4vw + 0.6rem, 1.25rem);
+}
+
+.statement-text--quoted {
+  font-style: italic;
+  font-family: var(--font-body);
   font-weight: 600;
-  font-size: clamp(1rem, 1.6vw + 0.6rem, 1.3rem);
 }
 
 .character {
-  width: min(60vw, 20rem);
-  max-height: 40vh;
+  width: min(55vw, 19rem);
+  max-height: 36vh;
   object-fit: contain;
   object-position: bottom;
-  margin: -1rem 0 0;
+  margin-top: -0.75rem;
   z-index: 1;
   filter: drop-shadow(0 1rem 2rem rgba(0, 0, 0, 0.35));
 }
 
 .streak-badge {
   position: absolute;
-  top: 1.5rem;
+  top: 1.25rem;
   right: 1.25rem;
   background: rgba(11, 11, 11, 0.75);
   color: #fff;
@@ -277,7 +359,7 @@ button {
   font-weight: 600;
   padding: 0.35rem 0.85rem;
   border-radius: 999px;
-  z-index: 3;
+  z-index: 4;
 }
 
 .columns {
@@ -346,6 +428,64 @@ button {
   z-index: 2;
 }
 
+/* ---------- Bulle du collègue Copilot (feedback) ---------- */
+
+.mascot-bubble {
+  position: absolute;
+  top: 0;
+  right: -0.5rem;
+  width: 8.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 5;
+  animation: mascot-in 0.2s ease-out;
+}
+
+@keyframes mascot-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mascot-bubble__text {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.mascot-bubble__text::after {
+  content: '';
+  position: absolute;
+  bottom: -0.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0.45rem 0.4rem 0;
+  border-style: solid;
+  border-color: #fff transparent transparent;
+}
+
+.mascot-bubble__portrait {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  margin-top: 0.6rem;
+  border: 3px solid #fff;
+  box-shadow: 0 0.4rem 0.75rem rgba(0, 0, 0, 0.3);
+  background-image: url('../images/mascotte-poses.webp');
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+}
+
+.mascot-bubble__portrait--pose0 { background-position: 0% 50%; }
+.mascot-bubble__portrait--pose1 { background-position: 50% 50%; }
+.mascot-bubble__portrait--pose2 { background-position: 100% 50%; }
+
 /* ---------- Barre de feedback ---------- */
 
 .feedback-bar {
@@ -379,11 +519,16 @@ button {
 
 .screen--bilan {
   justify-content: flex-start;
+  padding-bottom: 2.5rem;
 }
 
 .group-photo {
-  width: min(70vw, 22rem);
-  margin-top: 1rem;
+  width: min(60vw, 20rem);
+  margin-top: 0.5rem;
+}
+
+.panel--bilan {
+  margin-top: -2rem;
 }
 
 .bilan-score {
@@ -399,7 +544,7 @@ button {
   }
 
   .character {
-    width: min(55vw, 16rem);
+    width: min(50vw, 15rem);
   }
 }
 
@@ -417,7 +562,7 @@ button {
 
   .panel {
     padding: 1.5rem 1.25rem;
-    margin: 1rem auto;
+    margin: 1.5rem auto;
   }
 
   .columns {
@@ -430,15 +575,48 @@ button {
   }
 
   .character {
-    width: min(50vw, 11rem);
-    max-height: 28vh;
+    width: min(45vw, 10rem);
+    max-height: 24vh;
   }
 
-  .card-prompt {
-    padding: 1rem 1.25rem;
+  .reminder-box {
+    padding: 0.85rem 1.25rem;
+  }
+
+  .mascot-bubble {
+    position: static;
+    width: auto;
+    flex-direction: row-reverse;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+  }
+
+  .mascot-bubble__text {
+    max-width: 11rem;
+  }
+
+  .mascot-bubble__text::after {
+    bottom: auto;
+    left: -0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    border-width: 0.4rem 0.45rem 0.4rem 0;
+    border-color: transparent #fff transparent transparent;
+  }
+
+  .mascot-bubble__portrait {
+    width: 3.25rem;
+    height: 3.25rem;
+    margin-top: 0;
+    flex-shrink: 0;
   }
 
   .group-photo {
-    width: min(80vw, 16rem);
+    width: min(78vw, 15rem);
+  }
+
+  .panel--bilan {
+    margin-top: -1.25rem;
   }
 }
