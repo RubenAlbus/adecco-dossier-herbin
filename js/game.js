@@ -6,8 +6,8 @@
  * de scoring validé et transmet le résultat à Bubble via ACCGP.sendScore.
  *
  * La structure de chaque écran (bandeau, cadre à coins rouges, bandeau de
- * rappel du contexte, bulle du collègue Copilot, etc.) reproduit les écrans
- * de la maquette Figma « Mini Jeu 1_Développement_V2 ».
+ * rappel du contexte, bulle du collègue Copilot, etc.) reproduit à l'identique
+ * les écrans de la maquette Figma « Mini Jeu 1_Développement_V2 ».
  */
 'use strict';
 
@@ -45,33 +45,36 @@
   // panneaux narratifs et le bandeau de rappel de contexte.
   function bracketCorners() {
     return (
-      '<i class="corner corner--tl" aria-hidden="true"></i>' +
-      '<i class="corner corner--tr" aria-hidden="true"></i>' +
-      '<i class="corner corner--bl" aria-hidden="true"></i>' +
-      '<i class="corner corner--br" aria-hidden="true"></i>'
+      '<img class="corner corner--tl" src="images/corner-tl.svg" alt="" aria-hidden="true">' +
+      '<img class="corner corner--tr" src="images/corner-tr.svg" alt="" aria-hidden="true">' +
+      '<img class="corner corner--bl" src="images/corner-tl.svg" alt="" aria-hidden="true">' +
+      '<img class="corner corner--br" src="images/corner-tr.svg" alt="" aria-hidden="true">'
     );
   }
 
   function hudHtml(stepLabel, title, cardsLabel, options) {
     options = options || {};
-    var logo = options.logo
+    var left = options.logo
       ? '<img class="hud__logo" src="images/adecco-logo.webp" alt="Adecco">'
       : '<span class="hud__step">' + stepLabel + '</span>';
+    var right = options.logo
+      ? '<img class="hud__logo hud__logo--spacer" src="images/adecco-logo.webp" alt="" aria-hidden="true">'
+      : '<span class="hud__score" id="hud-score">' + state.score + ' points</span>';
     return (
-      '<header class="hud' + (options.modifier ? ' ' + options.modifier : '') + '">' +
-        logo +
+      '<header class="hud">' +
+        left +
         '<div class="hud__center">' +
           '<h2 class="hud__title">' + title + '</h2>' +
           (cardsLabel ? '<span class="hud__cards">' + cardsLabel + '</span>' : '') +
         '</div>' +
-        (options.hideScore ? '<span class="hud__score"></span>' : '<span class="hud__score" id="hud-score">' + state.score + ' points</span>') +
+        right +
       '</header>'
     );
   }
 
   // Bandeau de rappel du contexte de l'épreuve, affiché en haut des écrans
-  // de carte et de feedback (reprend le titre + contexte de l'intro, ou à
-  // défaut les deux paragraphes d'intro tels quels).
+  // de carte (reprend le titre + contexte de l'intro, ou à défaut les deux
+  // paragraphes d'intro tels quels).
   function reminderBoxHtml(ep) {
     var inner;
     if (ep.intro.title) {
@@ -88,6 +91,7 @@
     return (
       '<div class="mascot-bubble">' +
         '<div class="mascot-bubble__text">' + text + '</div>' +
+        '<img class="mascot-bubble__tail" src="images/bubble-tail.svg" alt="" aria-hidden="true">' +
         '<div class="mascot-bubble__portrait mascot-bubble__portrait--pose' + ep.mascotPose + '"></div>' +
       '</div>'
     );
@@ -157,7 +161,7 @@
       .map(function (col) {
         return (
           '<button class="column-btn column-btn--' + col.pill + '" data-col="' + col.id + '">' +
-            '<img class="column-btn__pill" src="images/pill-' + col.pill + '.webp" alt="">' +
+            '<img class="column-btn__pill' + (col.rotated ? ' column-btn__pill--rotated' : '') + '" src="images/pill-' + col.pill + '.webp" alt="">' +
             '<span>' + col.label + '</span>' +
           '</button>'
         );
@@ -172,11 +176,11 @@
         '<div class="card-stage">' +
           reminderBoxHtml(ep) +
           '<div class="stage-middle">' +
+            '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
             '<div class="statement-box">' +
               '<p class="statement-prefix">' + ep.cardLabel.prefix + '</p>' +
               '<p class="statement-text' + (ep.cardLabel.quoted ? ' statement-text--quoted' : '') + '">' + promptText + '</p>' +
             '</div>' +
-            '<img class="character character--' + ep.character + '" src="images/char-' + ep.character + '.webp" alt="">' +
           '</div>' +
           '<div class="streak-badge" id="streak-badge">Série : ' + state.streak + '</div>' +
           '<div class="columns">' + columnsHtml + '</div>' +
@@ -199,7 +203,7 @@
     var s = Math.max(0, Math.ceil(seconds));
     var mm = Math.floor(s / 60);
     var ss = s % 60;
-    return (mm < 10 ? '0' + mm : mm) + ':' + (ss < 10 ? '0' + ss : ss);
+    return (mm < 10 ? '0' + mm : mm) + ' : ' + (ss < 10 ? '0' + ss : ss);
   }
 
   function startTimer(totalSeconds) {
@@ -260,7 +264,7 @@
     }
     state.score += points;
 
-    markColumnButtons(ep, card, columnId, isCorrect);
+    markColumnButtons(card, isCorrect);
     updateHudLiveValues();
     showFeedback(ep, card, isCorrect, isTimeout, points);
   }
@@ -272,21 +276,18 @@
     if (streakEl) streakEl.textContent = 'Série : ' + state.streak;
   }
 
-  function markColumnButtons(ep, card, chosenColumnId, isCorrect) {
+  // Révèle la bonne réponse (vert) et toutes les mauvaises colonnes (rouge),
+  // que le joueur se soit trompé ou n'ait pas répondu à temps.
+  function markColumnButtons(card, isCorrect) {
     Array.prototype.forEach.call(document.querySelectorAll('.column-btn'), function (btn) {
       var colId = btn.getAttribute('data-col');
       btn.disabled = true;
       if (colId === card.correct) {
         btn.classList.add('column-btn--correct');
-      } else if (colId === chosenColumnId) {
+      } else if (!isCorrect) {
         btn.classList.add('column-btn--incorrect');
       }
     });
-  }
-
-  function columnLabel(ep, columnId) {
-    var col = ep.columns.filter(function (c) { return c.id === columnId; })[0];
-    return col ? col.label : '';
   }
 
   function showFeedback(ep, card, isCorrect, isTimeout, points) {
@@ -302,10 +303,8 @@
 
     var label = isTimeout ? DATA.timeoutLabel : DATA.wrongLabel;
     bar.className = 'feedback-bar feedback-bar--wrong';
-    bar.innerHTML =
-      '<p><strong>' + label + '.</strong> Réponse : ' + columnLabel(ep, card.correct) + '. ' + card.explanation + '</p>' +
-      '<button class="btn btn--continue" id="btn-continue">' + DATA.continueLabel + '</button>';
-    document.getElementById('btn-continue').addEventListener('click', advanceAfterFeedback);
+    bar.innerHTML = '<p><strong>' + label + '.</strong>' + card.explanation + '</p>';
+    bar.addEventListener('click', advanceAfterFeedback, { once: true });
 
     if (ep.showMascotOnFeedback) {
       var reactionPool = isTimeout ? DATA.mascotReactions.timeout : DATA.mascotReactions.wrong;
@@ -381,7 +380,7 @@
 
     render(
       '<section class="screen screen--narrative bg-light screen--bilan">' +
-        hudHtml(d.eyebrow, d.title, 'Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length, { logo: true, hideScore: true, modifier: 'hud--bilan' }) +
+        hudHtml(d.eyebrow, d.title, 'Étapes terminées : ' + DATA.epreuves.length + ' / ' + DATA.epreuves.length, { logo: true }) +
         '<img class="group-photo" src="images/group-photo.webp" alt="">' +
         '<div class="bracket-panel panel panel--bilan">' +
           bracketCorners() +

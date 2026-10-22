@@ -58,8 +58,8 @@ window.GAME_DATA = {
       character: 'neo',
       timerSeconds: 10,
       bonusThirds: [10 / 3, 20 / 3], // < 3,33 s / < 6,67 s / < 10 s
-      showMascotOnFeedback: false,
-      mascotPose: 0,
+      showMascotOnFeedback: true,
+      mascotPose: 2,
       intro: {
         lead: [
           'Mme Herbin a besoin d’un électricien, et vite.',
@@ -75,7 +75,7 @@ window.GAME_DATA = {
       cardLabel: { prefix: 'Pour cette mission, le critère est :', quoted: false },
       columns: [
         { id: 'indispensable', label: 'Indispensable', pill: 'blue' },
-        { id: 'ajustable', label: 'Ajustable', pill: 'red' },
+        { id: 'ajustable', label: 'Ajustable', pill: 'pink' },
       ],
       cards: [
         {
@@ -124,7 +124,7 @@ window.GAME_DATA = {
       timerSeconds: 12,
       bonusThirds: [4, 8], // < 4 s / < 8 s / < 12 s
       showMascotOnFeedback: true,
-      mascotPose: 1,
+      mascotPose: 0,
       intro: {
         lead: [
           'Tu as rencontré Gérard, électricien depuis plus de 20 ans : un bon profil, avec quelques points à approfondir.',
@@ -137,8 +137,8 @@ window.GAME_DATA = {
       cardLabel: { prefix: 'Pour cette mission, le critère est :', quoted: false },
       columns: [
         { id: 'atout', label: 'Atout', pill: 'blue' },
-        { id: 'ecart', label: 'Écart compensable', pill: 'pink' },
-        { id: 'approfondir', label: 'À approfondir', pill: 'red' },
+        { id: 'ecart', label: 'Écart compensable', pill: 'blue', rotated: true },
+        { id: 'approfondir', label: 'À approfondir', pill: 'pink' },
       ],
       cards: [
         {
@@ -187,7 +187,7 @@ window.GAME_DATA = {
       timerSeconds: 9,
       bonusThirds: [3, 6], // < 3 s / < 6 s / < 9 s
       showMascotOnFeedback: true,
-      mascotPose: 2,
+      mascotPose: 1,
       intro: {
         lead: [
           'Tu as transmis à Copilot la demande client, le CV de Gérard et ta synthèse d’entretien.',
@@ -200,8 +200,8 @@ window.GAME_DATA = {
       cardLabel: { prefix: 'Copilot affirme :', quoted: true },
       columns: [
         { id: 'confirme', label: 'Fait confirmé', pill: 'blue' },
-        { id: 'hypothese', label: 'Hypothèse', pill: 'pink' },
-        { id: 'verifier', label: 'À vérifier', pill: 'red' },
+        { id: 'hypothese', label: 'Hypothèse', pill: 'blue', rotated: true },
+        { id: 'verifier', label: 'À vérifier', pill: 'pink' },
       ],
       cards: [
         {
