@@ -6,8 +6,7 @@ const assert = require('node:assert/strict');
 const { cardPoints, finalScore, tierFor, shuffle } = require('../js/scoring.js');
 
 const RULES = {
-  basePoints: 7,
-  speedBonus: [3, 2, 1],
+  pointsPerCard: 10,
   minimumFinalScore: 1,
   tiers: [
     { id: 'maitrise', minRate: 0.85 },
@@ -17,32 +16,11 @@ const RULES = {
 };
 
 test('une mauvaise réponse ou un chrono écoulé rapporte 0 point', () => {
-  assert.equal(cardPoints(false, 500, 10, RULES), 0);
-  assert.equal(cardPoints(false, 10000, 10, RULES), 0);
+  assert.equal(cardPoints(false, RULES), 0);
 });
 
-test('bonne réponse : 7 points + bonus selon le tiers du chrono (épreuve 1, 10 s)', () => {
-  assert.equal(cardPoints(true, 0, 10, RULES), 10);
-  assert.equal(cardPoints(true, 3329, 10, RULES), 10);
-  assert.equal(cardPoints(true, 3334, 10, RULES), 9);
-  assert.equal(cardPoints(true, 6666, 10, RULES), 9);
-  assert.equal(cardPoints(true, 6667, 10, RULES), 8);
-  assert.equal(cardPoints(true, 10000, 10, RULES), 8);
-});
-
-test('seuils des épreuves 2 (12 s) et 3 (9 s)', () => {
-  assert.equal(cardPoints(true, 3999, 12, RULES), 10);
-  assert.equal(cardPoints(true, 4000, 12, RULES), 9);
-  assert.equal(cardPoints(true, 8000, 12, RULES), 8);
-  assert.equal(cardPoints(true, 2999, 9, RULES), 10);
-  assert.equal(cardPoints(true, 3000, 9, RULES), 9);
-  assert.equal(cardPoints(true, 6000, 9, RULES), 8);
-});
-
-test('une carte rapporte toujours 0, 8, 9 ou 10 points', () => {
-  for (let ms = 0; ms <= 12000; ms += 250) {
-    assert.ok([8, 9, 10].includes(cardPoints(true, ms, 12, RULES)));
-  }
+test('une bonne réponse rapporte tous les points, sans bonus de rapidité', () => {
+  assert.equal(cardPoints(true, RULES), 10);
 });
 
 test('score final : somme des cartes, 210 au maximum, jamais 0', () => {

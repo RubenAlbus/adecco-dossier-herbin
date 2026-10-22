@@ -269,9 +269,8 @@
 
     const ep = currentEpreuve();
     const card = currentCard();
-    const elapsed = performance.now() - state.cardStartedAt;
     const isCorrect = columnId === card.correct;
-    const points = cardPoints(isCorrect, elapsed, ep.timerSeconds, RULES);
+    const points = cardPoints(isCorrect, RULES);
 
     state.score += points;
     if (isCorrect) state.correctCount += 1;

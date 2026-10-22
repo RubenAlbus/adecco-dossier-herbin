@@ -17,9 +17,9 @@ Mme Herbin cherche un technicien de maintenance autonome. Avec Copilot, le joueu
 
 Le joueur répond en cliquant sur une colonne ou en y glissant la carte. Bonne réponse : feedback vert, carte suivante après 1,6 s. Erreur ou temps écoulé : la bonne colonne passe en vert, la colonne choisie en rouge, la mascotte apparaît avec le bouton « Continuer ».
 
-## Barème (document « Scoring explication » validé le 21/10/2026)
+## Barème (document « Scoring explication » du 21/10/2026, revu par la cliente le 22/10/2026)
 
-- Bonne réponse : 7 points + bonus de rapidité de +3, +2 ou +1 selon le tiers du chrono. Une carte vaut donc 0, 8, 9 ou 10 points.
+- Bonne réponse : 10 points, quel que soit le temps mis. Pas de bonus de rapidité.
 - Mauvaise réponse ou temps écoulé : 0 point. Aucun malus.
 - Score final : somme des 21 cartes, entre **1** (minimum garanti) et **210**.
 - Message du bilan selon le taux de bonnes réponses : 85 % et plus « Dossier maîtrisé », de 60 à 84 % « Bon réflexe global », moins de 60 % « De bons réflexes à consolider ».

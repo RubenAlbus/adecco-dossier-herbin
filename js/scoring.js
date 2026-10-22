@@ -1,23 +1,19 @@
 /**
  * scoring.js : barème du jeu, en fonctions pures (testées dans tests/).
- * Règles : document « Scoring explication » de la page Figma V2, validé le 21/10/2026.
+ * Règles : document « Scoring explication » de la page Figma V2 (21/10/2026),
+ * sans bonus de rapidité à la demande de la cliente (22/10/2026).
  */
 (function (root) {
   'use strict';
 
   /**
-   * Points d'une carte : 0 si faux ou temps écoulé, sinon 7 + bonus de rapidité
-   * (+3 / +2 / +1 selon le tiers du chrono dans lequel le joueur a répondu).
+   * Points d'une carte : tous les points pour une bonne réponse, quel que soit
+   * le temps mis ; 0 si faux ou temps écoulé.
    * @param {boolean} isCorrect
-   * @param {number} elapsedMs   temps entre l'apparition de la carte et la réponse
-   * @param {number} timerSeconds durée du chrono de l'épreuve
-   * @param {{ basePoints: number, speedBonus: number[] }} rules
+   * @param {{ pointsPerCard: number }} rules
    */
-  function cardPoints(isCorrect, elapsedMs, timerSeconds, rules) {
-    if (!isCorrect) return 0;
-    const third = (timerSeconds * 1000) / 3;
-    const index = Math.min(2, Math.max(0, Math.floor(elapsedMs / third)));
-    return rules.basePoints + rules.speedBonus[index];
+  function cardPoints(isCorrect, rules) {
+    return isCorrect ? rules.pointsPerCard : 0;
   }
 
   /** Score final : somme des cartes, jamais inférieur au minimum (1 point). */

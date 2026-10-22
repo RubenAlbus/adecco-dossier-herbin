@@ -5,7 +5,8 @@
  * Plateformes_Adecco, page 588:231). Tous les textes sont copiés mot pour mot
  * depuis les écrans Accueil, Intro, Question, Juste, Faux, TempsEcoule et Fin.
  * Le barème vient du document « Scoring explication » de la même page
- * (version validée le 21/10/2026).
+ * (version validée le 21/10/2026), modifié par la cliente le 22/10/2026 :
+ * plus de bonus de rapidité, une bonne réponse rapporte tous les points.
  *
  * Format des textes de panneau :
  *   blocks = [ bloc, bloc, ... ]   (blocs séparés par l'espacement Figma)
@@ -27,8 +28,7 @@ window.GAME_DATA = {
   },
 
   scoring: {
-    basePoints: 7,
-    speedBonus: [3, 2, 1],        // 1er, 2e, 3e tiers du chrono
+    pointsPerCard: 10,            // bonne réponse : tous les points, quel que soit le temps
     minimumFinalScore: 1,
     autoAdvanceMs: 1600,          // délai avant la carte suivante après une bonne réponse
     tiers: [                       // seuils sur le taux de bonnes réponses
@@ -224,7 +224,7 @@ window.GAME_DATA = {
     messages: {
       maitrise: 'Dossier maîtrisé : tu sais quoi confier à Copilot, tu le briefes avec précision et tu gardes la main sur ses réponses.',
       bon: "Bon réflexe global. Revois les ingrédients d'un bon prompt et la distinction entre hypothèse et information à vérifier.",
-      consolider: "De bons réflexes à consolider. Le replay des webinaires t'attend sur ADICT.",
+      consolider: "De bons réflexes à consolider. Le replay des webinaires t'attend sur Digital Campus.",
     },
     // Taille du texte du bilan, propre à chaque écran Fin de la maquette.
     messageFontSize: { maitrise: 16, bon: 22, consolider: 22 },
